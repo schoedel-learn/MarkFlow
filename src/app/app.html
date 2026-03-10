@@ -1,0 +1,147 @@
+<main class="min-h-screen p-4 md:p-8 flex flex-col items-center justify-center bg-stone-50">
+  <!-- Header -->
+  <header class="text-center mb-12 animate-in fade-in slide-in-from-top-4 duration-700">
+    <h1 class="font-display text-5xl md:text-7xl mb-4 text-stone-900">MarkFlow</h1>
+    <p class="text-stone-500 font-sans tracking-wide uppercase text-xs font-semibold">The Elegant Document Converter</p>
+  </header>
+
+  <!-- Mode Switcher -->
+  <div class="flex gap-2 mb-8 p-1 bg-stone-200 rounded-full shadow-inner">
+    <button 
+      (click)="setMode('md-to-doc')"
+      [class.bg-white]="mode() === 'md-to-doc'"
+      [class.shadow-sm]="mode() === 'md-to-doc'"
+      class="px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 flex items-center gap-2"
+    >
+      <mat-icon class="text-sm scale-75">description</mat-icon>
+      Markdown to Doc
+    </button>
+    <button 
+      (click)="setMode('doc-to-md')"
+      [class.bg-white]="mode() === 'doc-to-md'"
+      [class.shadow-sm]="mode() === 'doc-to-md'"
+      class="px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 flex items-center gap-2"
+    >
+      <mat-icon class="text-sm scale-75">swap_horiz</mat-icon>
+      Doc to Markdown
+    </button>
+  </div>
+
+  <!-- Main Card -->
+  <div class="glass-card w-full max-w-2xl p-8 md:p-12 transition-all duration-500">
+    
+    <!-- Upload Area -->
+    <div 
+      class="relative border-2 border-dashed border-stone-200 rounded-2xl p-12 text-center transition-colors hover:border-stone-400 group cursor-pointer"
+      (click)="fileInput.click()"
+      (keydown.enter)="fileInput.click()"
+      (keydown.space)="fileInput.click()"
+      tabindex="0"
+      role="button"
+      aria-label="Upload file"
+    >
+      <input 
+        #fileInput 
+        type="file" 
+        class="hidden" 
+        (change)="onFileSelected($event)"
+        [accept]="mode() === 'md-to-doc' ? '.md,.txt' : '.docx,.pdf'"
+      >
+      
+      <div class="flex flex-col items-center gap-4">
+        <div class="w-16 h-16 bg-stone-100 rounded-full flex items-center justify-center group-hover:bg-stone-200 transition-colors">
+          <mat-icon class="text-stone-400 group-hover:text-stone-600">cloud_upload</mat-icon>
+        </div>
+        
+        @if (!selectedFile()) {
+          <div>
+            <p class="text-lg font-medium text-stone-700">
+              Click to upload or drag & drop
+            </p>
+            <p class="text-sm text-stone-400 mt-1">
+              {{ mode() === 'md-to-doc' ? 'Supports .md and .txt' : 'Supports .docx and .pdf' }}
+            </p>
+          </div>
+        } @else {
+          <div class="animate-in zoom-in duration-300">
+            <p class="text-lg font-medium text-stone-900">{{ selectedFile()?.name }}</p>
+            <p class="text-xs text-stone-400 uppercase tracking-widest mt-1">File Selected</p>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Error Message -->
+    @if (error()) {
+      <div class="mt-6 p-4 bg-red-50 text-red-600 rounded-xl text-sm flex items-center gap-2 animate-in slide-in-from-bottom-2">
+        <mat-icon class="text-sm">error_outline</mat-icon>
+        {{ error() }}
+      </div>
+    }
+
+    <!-- Actions -->
+    @if (selectedFile()) {
+      <div class="mt-8 flex flex-col gap-4 animate-in slide-in-from-bottom-4 duration-500">
+        
+        @if (mode() === 'md-to-doc') {
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <button 
+              (click)="convertToPdf()"
+              [disabled]="isProcessing()"
+              class="flex items-center justify-center gap-3 bg-stone-900 text-white py-4 rounded-xl font-medium hover:bg-stone-800 disabled:opacity-50 transition-all active:scale-95"
+            >
+              @if (isProcessing()) {
+                <div class="spinner"></div>
+              } @else {
+                <mat-icon>picture_as_pdf</mat-icon>
+                Download PDF
+              }
+            </button>
+            <button 
+              (click)="convertToDocx()"
+              [disabled]="isProcessing()"
+              class="flex items-center justify-center gap-3 bg-white border border-stone-200 text-stone-900 py-4 rounded-xl font-medium hover:bg-stone-50 disabled:opacity-50 transition-all active:scale-95"
+            >
+              @if (isProcessing()) {
+                <div class="spinner-dark"></div>
+              } @else {
+                <mat-icon>description</mat-icon>
+                Download Word
+              }
+            </button>
+          </div>
+        } @else {
+          <button 
+            (click)="convertToMarkdown()"
+            [disabled]="isProcessing()"
+            class="flex items-center justify-center gap-3 bg-stone-900 text-white py-4 rounded-xl font-medium hover:bg-stone-800 disabled:opacity-50 transition-all active:scale-95"
+          >
+            @if (isProcessing()) {
+              <div class="spinner"></div>
+            } @else {
+              <mat-icon>code</mat-icon>
+              Convert to Markdown
+            }
+          </button>
+        }
+
+        <button 
+          (click)="reset()"
+          class="text-stone-400 hover:text-stone-600 text-sm font-medium transition-colors"
+        >
+          Cancel and choose another file
+        </button>
+      </div>
+    }
+  </div>
+
+  <!-- Footer -->
+  <footer class="mt-12 text-stone-400 text-xs flex items-center gap-4">
+    <span>Private & Secure</span>
+    <span class="w-1 h-1 bg-stone-200 rounded-full"></span>
+    <span>Client-side Conversion</span>
+    <span class="w-1 h-1 bg-stone-200 rounded-full"></span>
+    <span>No Data Leaves Your Browser</span>
+  </footer>
+</main>
+

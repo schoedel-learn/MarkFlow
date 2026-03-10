@@ -1,0 +1,5 @@
+{
+  "name": "MarkFlow: Markdown & Document Converter",
+  "description": "A high-fidelity utility to convert between Markdown, PDF, and Word documents securely in your browser.",
+  "requestFramePermissions": []
+}
