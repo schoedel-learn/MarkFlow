@@ -31,6 +31,7 @@
     "buffer": "^6.0.3",
     "docx": "^9.1.0",
     "express": "^5.1.0",
+    "firebase": "^12.10.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.0",
     "mammoth": "^1.8.0",

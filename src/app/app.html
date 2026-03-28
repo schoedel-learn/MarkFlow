@@ -1,34 +1,104 @@
-<main class="min-h-screen p-4 md:p-8 flex flex-col items-center justify-center bg-stone-50">
+<main class="min-h-screen p-4 md:p-8 flex flex-col items-center justify-center bg-stone-50 relative">
+  <!-- User Profile / Login -->
+  <div class="absolute top-4 right-4 md:top-8 md:right-8 z-50 flex items-center gap-4">
+    @if (isAuthReady() && user()) {
+      <button 
+        (click)="openBugReportModal()"
+        title="Report a bug"
+        class="flex items-center justify-center w-12 h-12 rounded-full border-2 border-transparent hover:border-stone-400 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-stone-400 overflow-hidden bg-stone-100 text-stone-500 hover:text-stone-800"
+      >
+        <mat-icon>bug_report</mat-icon>
+      </button>
+      <div class="relative">
+        <button 
+          (click)="toggleProfileMenu()" 
+          title="Profile"
+          class="block w-12 h-12 rounded-full border-2 border-transparent hover:border-stone-400 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-stone-400 overflow-hidden bg-stone-100"
+        >
+          <img [src]="user()?.photoURL" alt="Profile" class="w-full h-full object-cover">
+        </button>
+
+        @if (isProfileMenuOpen()) {
+          <div class="fixed inset-0 z-40" (click)="closeProfileMenu()" (keydown.enter)="closeProfileMenu()" tabindex="0" role="button" aria-label="Close menu"></div>
+          <div class="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-lg border border-stone-100 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-50">
+            <div class="px-4 py-4 border-b border-stone-100">
+              <p class="text-sm font-medium text-stone-900 truncate mb-1">{{ user()?.displayName }}</p>
+              <p class="text-xs text-stone-500 truncate">{{ user()?.email }}</p>
+            </div>
+            
+            <div class="px-4 py-4 border-b border-stone-100 bg-stone-50/50">
+              <div class="flex items-center gap-2 mb-2">
+                <mat-icon class="text-stone-400 text-sm scale-75">shield</mat-icon>
+                <p class="text-xs font-semibold text-stone-700 uppercase tracking-wider">Your Data</p>
+              </div>
+              <p class="text-xs text-stone-500 leading-relaxed">
+                We only store your basic profile info (name, email, profile img URL) and a daily conversion counter (limit 20/day). 
+                User data is automatically deleted the first day of every month at 12:01am.
+                <strong class="font-medium text-stone-700">Your document data is never saved.</strong>
+              </p>
+            </div>
+
+            <div class="py-2">
+              <button 
+                (click)="logout()" 
+                class="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors text-left"
+              >
+                <mat-icon class="text-red-500">logout</mat-icon>
+                Sign out
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </div>
+
   <!-- Header -->
   <header class="text-center mb-12 animate-in fade-in slide-in-from-top-4 duration-700">
     <h1 class="font-display text-5xl md:text-7xl mb-4 text-stone-900">MarkFlow</h1>
-    <p class="text-stone-500 font-sans tracking-wide uppercase text-xs font-semibold">The Elegant Document Converter</p>
+    <p class="text-stone-500 font-sans tracking-wide uppercase text-xs font-semibold mb-2">A Markdown Converter That Works</p>
+    <p class="text-stone-400 font-sans text-sm">No cost, powered by Google Gemini</p>
   </header>
 
-  <!-- Mode Switcher -->
-  <div class="flex gap-2 mb-8 p-1 bg-stone-200 rounded-full shadow-inner">
-    <button 
-      (click)="setMode('md-to-doc')"
-      [class.bg-white]="mode() === 'md-to-doc'"
-      [class.shadow-sm]="mode() === 'md-to-doc'"
-      class="px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 flex items-center gap-2"
-    >
-      <mat-icon class="text-sm scale-75">description</mat-icon>
-      Markdown to Doc
-    </button>
-    <button 
-      (click)="setMode('doc-to-md')"
-      [class.bg-white]="mode() === 'doc-to-md'"
-      [class.shadow-sm]="mode() === 'doc-to-md'"
-      class="px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 flex items-center gap-2"
-    >
-      <mat-icon class="text-sm scale-75">swap_horiz</mat-icon>
-      Doc to Markdown
-    </button>
-  </div>
+  @if (!isAuthReady()) {
+    <div class="spinner-dark my-12"></div>
+  } @else if (!user()) {
+    <div class="glass-card w-full max-w-md p-8 text-center animate-in zoom-in duration-500">
+      <div class="w-16 h-16 bg-stone-100 rounded-full flex items-center justify-center mx-auto mb-6">
+        <mat-icon class="text-stone-600 text-3xl">lock</mat-icon>
+      </div>
+      <h2 class="text-2xl font-display font-bold text-stone-900 mb-2">Sign In Required</h2>
+      <p class="text-stone-500 mb-8">Please sign in with your Google account to use MarkFlow's conversion tools.</p>
+      <button (click)="login()" class="w-full flex items-center justify-center gap-3 bg-stone-900 text-white py-4 rounded-xl font-medium hover:bg-stone-800 transition-all active:scale-95">
+        <mat-icon>login</mat-icon>
+        Sign in with Google
+      </button>
+    </div>
+  } @else {
+    <!-- Mode Switcher -->
+    <div class="flex gap-2 mb-8 p-1 bg-stone-200 rounded-full shadow-inner animate-in fade-in duration-500">
+      <button 
+        (click)="setMode('md-to-doc')"
+        [class.bg-white]="mode() === 'md-to-doc'"
+        [class.shadow-sm]="mode() === 'md-to-doc'"
+        class="px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 flex items-center gap-2"
+      >
+        <mat-icon class="text-sm scale-75">description</mat-icon>
+        Markdown to Doc
+      </button>
+      <button 
+        (click)="setMode('doc-to-md')"
+        [class.bg-white]="mode() === 'doc-to-md'"
+        [class.shadow-sm]="mode() === 'doc-to-md'"
+        class="px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 flex items-center gap-2"
+      >
+        <mat-icon class="text-sm scale-75">swap_horiz</mat-icon>
+        Doc to Markdown
+      </button>
+    </div>
 
-  <!-- Main Card -->
-  <div class="glass-card w-full max-w-2xl p-8 md:p-12 transition-all duration-500">
+    <!-- Main Card -->
+    <div class="glass-card w-full max-w-2xl p-8 md:p-12 transition-all duration-500 animate-in slide-in-from-bottom-4">
     
     <!-- Upload Area -->
     <div 
@@ -56,10 +126,10 @@
         @if (!selectedFile()) {
           <div>
             <p class="text-lg font-medium text-stone-700">
-              Click to upload or drag & drop
+              Click to upload, drag & drop, or paste (Ctrl+V)
             </p>
             <p class="text-sm text-stone-400 mt-1">
-              {{ mode() === 'md-to-doc' ? 'Supports .md and .txt' : 'Supports .docx and .pdf' }}
+              {{ mode() === 'md-to-doc' ? 'Supports .md, .txt, or pasted text' : 'Supports .docx, .pdf, or pasted rich text' }}
             </p>
           </div>
         } @else {
@@ -87,10 +157,10 @@
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <button 
               (click)="convertToPdf()"
-              [disabled]="isProcessing()"
+              [disabled]="processingAction() !== null"
               class="flex items-center justify-center gap-3 bg-stone-900 text-white py-4 rounded-xl font-medium hover:bg-stone-800 disabled:opacity-50 transition-all active:scale-95"
             >
-              @if (isProcessing()) {
+              @if (processingAction() === 'pdf') {
                 <div class="spinner"></div>
               } @else {
                 <mat-icon>picture_as_pdf</mat-icon>
@@ -99,10 +169,10 @@
             </button>
             <button 
               (click)="convertToDocx()"
-              [disabled]="isProcessing()"
-              class="flex items-center justify-center gap-3 bg-white border border-stone-200 text-stone-900 py-4 rounded-xl font-medium hover:bg-stone-50 disabled:opacity-50 transition-all active:scale-95"
+              [disabled]="processingAction() !== null"
+              class="flex items-center justify-center gap-3 bg-white border-2 border-stone-300 shadow-sm text-stone-900 py-4 rounded-xl font-medium hover:bg-stone-50 hover:border-stone-400 disabled:opacity-50 transition-all active:scale-95"
             >
-              @if (isProcessing()) {
+              @if (processingAction() === 'docx') {
                 <div class="spinner-dark"></div>
               } @else {
                 <mat-icon>description</mat-icon>
@@ -113,10 +183,10 @@
         } @else {
           <button 
             (click)="convertToMarkdown()"
-            [disabled]="isProcessing()"
+            [disabled]="processingAction() !== null"
             class="flex items-center justify-center gap-3 bg-stone-900 text-white py-4 rounded-xl font-medium hover:bg-stone-800 disabled:opacity-50 transition-all active:scale-95"
           >
-            @if (isProcessing()) {
+            @if (processingAction() === 'md') {
               <div class="spinner"></div>
             } @else {
               <mat-icon>code</mat-icon>
@@ -134,14 +204,82 @@
       </div>
     }
   </div>
+  }
+
+  <!-- Bug Report Modal -->
+  @if (isBugReportModalOpen()) {
+    <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+      <div class="absolute inset-0 bg-stone-900/40 backdrop-blur-sm" (click)="closeBugReportModal()" (keydown.enter)="closeBugReportModal()" tabindex="0" role="button" aria-label="Close modal"></div>
+      <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
+        <div class="px-6 py-5 border-b border-stone-100 flex justify-between items-center bg-stone-50/50">
+          <h3 class="text-lg font-display font-bold text-stone-900 flex items-center gap-2">
+            <mat-icon class="text-stone-500">bug_report</mat-icon>
+            Report a Bug
+          </h3>
+          <button (click)="closeBugReportModal()" class="text-stone-400 hover:text-stone-600 transition-colors">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+        
+        <div class="p-6">
+          @if (bugReportSuccess()) {
+            <div class="text-center py-8 animate-in fade-in zoom-in duration-300">
+              <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-green-600">
+                <mat-icon class="text-3xl">check_circle</mat-icon>
+              </div>
+              <h4 class="text-xl font-medium text-stone-900 mb-2">Report Submitted</h4>
+              <p class="text-stone-500">Thank you for helping us improve MarkFlow!</p>
+              <button (click)="closeBugReportModal()" class="mt-6 px-6 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-lg font-medium transition-colors">
+                Close
+              </button>
+            </div>
+          } @else {
+            <p class="text-sm text-stone-500 mb-4">
+              Describe the issue you're experiencing. We'll send this to <strong>contact@schoedel.design</strong>.
+            </p>
+            <textarea 
+              #bugInput
+              [value]="bugReportText()"
+              (input)="updateBugReportText(bugInput.value)"
+              rows="5" 
+              class="w-full border border-stone-200 rounded-xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-stone-400 focus:border-transparent resize-none transition-all"
+              placeholder="What happened? What did you expect to happen? Please include steps to reproduce if possible."
+            ></textarea>
+            
+            <div class="mt-6 flex justify-end gap-3">
+              <button 
+                (click)="closeBugReportModal()"
+                class="px-5 py-2.5 text-sm font-medium text-stone-600 hover:bg-stone-100 rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                (click)="submitBugReport()"
+                [disabled]="!bugReportText().trim() || isSubmittingBugReport()"
+                class="px-5 py-2.5 text-sm font-medium bg-stone-900 text-white rounded-xl hover:bg-stone-800 disabled:opacity-50 transition-all flex items-center gap-2"
+              >
+                @if (isSubmittingBugReport()) {
+                  <div class="spinner w-4 h-4 border-2"></div>
+                  Sending...
+                } @else {
+                  <mat-icon class="text-sm scale-75">send</mat-icon>
+                  Submit Report
+                }
+              </button>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
 
   <!-- Footer -->
-  <footer class="mt-12 text-stone-400 text-xs flex items-center gap-4">
-    <span>Private & Secure</span>
-    <span class="w-1 h-1 bg-stone-200 rounded-full"></span>
-    <span>Client-side Conversion</span>
-    <span class="w-1 h-1 bg-stone-200 rounded-full"></span>
-    <span>No Data Leaves Your Browser</span>
+  <footer class="mt-12 text-stone-400 text-xs flex flex-col items-center gap-3">
+    <div class="font-sans">
+      <a href="https://schoedel.design" target="_blank" rel="noopener noreferrer" class="hover:text-stone-600 transition-colors">
+        Schoedel Design AI &copy; 2026
+      </a>
+    </div>
   </footer>
 </main>
 

@@ -1,0 +1,44 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user profile",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "User ID" },
+        "email": { "type": "string", "description": "User Email" },
+        "displayName": { "type": "string", "description": "User Display Name" },
+        "photoURL": { "type": "string", "description": "User Photo URL" },
+        "createdAt": { "type": "timestamp", "description": "Creation Time" },
+        "conversionsToday": { "type": "number", "description": "Number of conversions done today" },
+        "lastConversionDate": { "type": "string", "description": "Date of the last conversion (YYYY-MM-DD)" }
+      },
+      "required": ["uid", "email"]
+    },
+    "ConversionError": {
+      "title": "Conversion Error",
+      "description": "An error that occurred during file conversion",
+      "type": "object",
+      "properties": {
+        "action": { "type": "string", "description": "The conversion action that failed" },
+        "errorMessage": { "type": "string", "description": "The error message" },
+        "errorStack": { "type": "string", "description": "The error stack trace" },
+        "timestamp": { "type": "string", "description": "ISO timestamp of the error" },
+        "userId": { "type": "string", "description": "The ID of the user who encountered the error" },
+        "userEmail": { "type": "string", "description": "The email of the user who encountered the error" },
+        "filename": { "type": "string", "description": "The name of the file being converted" }
+      },
+      "required": ["action", "errorMessage", "timestamp", "userId"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles"
+    },
+    "/conversion_errors/{errorId}": {
+      "schema": { "$ref": "#/entities/ConversionError" },
+      "description": "Conversion errors"
+    }
+  }
+}
