@@ -54,7 +54,7 @@ MarkFlow is an Angular-based document conversion app focused on Markdown workflo
 ## Available scripts
 
 - `npm run dev` — run local dev server on port 3000
-- `npm run start` — run Angular dev server
+- `npm run start` — run Angular dev server on the default port (typically 4200)
 - `npm run build` — build production bundles
 - `npm run watch` — build in watch mode
 - `npm run test` — run unit tests
