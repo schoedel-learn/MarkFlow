@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, signal, inject, OnInit, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ConverterService } from './converter.service';
+import { ConverterService, MarkdownFlavor } from './converter.service';
 import { MatIconModule } from '@angular/material/icon';
 import { auth, signInWithGoogle, logOut, db } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
@@ -20,7 +20,8 @@ export class App implements OnInit {
   private converter = inject(ConverterService);
   
   mode = signal<ConversionMode>('md-to-doc');
-  processingAction = signal<'pdf' | 'docx' | 'md' | null>(null);
+  markdownFlavor = signal<MarkdownFlavor>('auto');
+  processingAction = signal<'pdf' | 'docx' | 'md' | 'txt' | null>(null);
   error = signal<string | null>(null);
   
   // Auth & AI Key
@@ -39,6 +40,7 @@ export class App implements OnInit {
   // For MD to Doc
   selectedFile = signal<File | null>(null);
   fileContent = signal<string | null>(null);
+  convertedText = signal<string | null>(null);
 
   ngOnInit() {
     onAuthStateChanged(auth, async (user) => {
@@ -185,6 +187,7 @@ export class App implements OnInit {
   reset() {
     this.selectedFile.set(null);
     this.fileContent.set(null);
+    this.convertedText.set(null);
     this.error.set(null);
   }
 
@@ -205,10 +208,27 @@ export class App implements OnInit {
     }
   }
 
+  pasteTimeout: ReturnType<typeof setTimeout> | undefined;
+  onTextInput(event: Event) {
+    const target = event.target as HTMLTextAreaElement;
+    const text = target.value;
+    
+    clearTimeout(this.pasteTimeout);
+    this.pasteTimeout = setTimeout(() => {
+      if (text.trim()) {
+        this.fileContent.set(text);
+        const ext = this.mode() === 'md-to-doc' ? 'md' : 'txt';
+        this.selectedFile.set(new File([text], `typed-content.${ext}`, { type: 'text/plain' }));
+        this.error.set(null);
+        target.value = '';
+      }
+    }, 1000);
+  }
+
   @HostListener('window:paste', ['$event'])
   onPaste(event: ClipboardEvent) {
     const target = event.target as HTMLElement;
-    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+    if (target.tagName === 'INPUT' || (target.tagName === 'TEXTAREA' && target.id !== 'main-paste-area')) return;
 
     const clipboardData = event.clipboardData;
     if (!clipboardData) return;
@@ -216,6 +236,7 @@ export class App implements OnInit {
     if (this.mode() === 'md-to-doc') {
       const text = clipboardData.getData('text/plain');
       if (text) {
+        event.preventDefault();
         this.fileContent.set(text);
         this.selectedFile.set(new File([text], 'pasted-snippet.md', { type: 'text/markdown' }));
         this.error.set(null);
@@ -224,9 +245,11 @@ export class App implements OnInit {
       const html = clipboardData.getData('text/html');
       const text = clipboardData.getData('text/plain');
       if (html) {
+        event.preventDefault();
         this.selectedFile.set(new File([html], 'pasted-content.html', { type: 'text/html' }));
         this.error.set(null);
       } else if (text) {
+        event.preventDefault();
         this.selectedFile.set(new File([text], 'pasted-content.txt', { type: 'text/plain' }));
         this.error.set(null);
       }
@@ -252,8 +275,8 @@ export class App implements OnInit {
         lastDate = data['lastConversionDate'] || '';
       }
 
-      if (lastDate === today && count >= 20) {
-        this.error.set("You've reached your daily limit of 20 conversions. We hope you're enjoying MarkFlow! Please come back tomorrow to convert more documents.");
+      if (lastDate === today && count >= 5) {
+        this.error.set("You've reached your daily limit of 5 conversions. We hope you're enjoying MarkFlow! Please come back tomorrow to convert more documents.");
         return false;
       }
       return true;
@@ -326,7 +349,7 @@ export class App implements OnInit {
 
     this.processingAction.set('pdf');
     try {
-      await this.converter.mdToPdf(content, file.name);
+      await this.converter.mdToPdf(content, file.name, this.markdownFlavor());
       await this.incrementConversionCount();
     } catch (err) {
       this.error.set('Failed to convert to PDF');
@@ -346,7 +369,7 @@ export class App implements OnInit {
 
     this.processingAction.set('docx');
     try {
-      await this.converter.mdToDocx(content, file.name);
+      await this.converter.mdToDocx(content, file.name, this.markdownFlavor());
       await this.incrementConversionCount();
     } catch (err) {
       this.error.set('Failed to convert to Word');
@@ -367,11 +390,11 @@ export class App implements OnInit {
     try {
       let md = '';
       if (file.name.endsWith('.docx')) {
-        md = await this.converter.docxToMd(file);
+        md = await this.converter.docxToMd(file, this.markdownFlavor());
       } else if (file.name.endsWith('.pdf')) {
-        md = await this.converter.pdfToMd(file);
+        md = await this.converter.pdfToMd(file, this.markdownFlavor());
       } else if (file.name.endsWith('.html')) {
-        md = this.converter.htmlToMd(await file.text());
+        md = await this.converter.htmlToMd(await file.text(), this.markdownFlavor());
       } else if (file.name.endsWith('.txt')) {
         md = await file.text();
       } else {
@@ -389,7 +412,29 @@ export class App implements OnInit {
     }
   }
 
+  async convertToText() {
+    if (!(await this.canConvert())) return;
+
+    const file = this.selectedFile();
+    const content = this.fileContent();
+    if (!file && !content) return;
+
+    this.processingAction.set('txt');
+    try {
+      const text = await this.converter.toPlainText(this.mode() === 'md-to-doc' ? content! : file!);
+      this.downloadFile(text, (file?.name || 'document').replace(/\.(md|docx|pdf|html|txt)$/, '.txt'), 'text/plain');
+      await this.incrementConversionCount();
+    } catch (err) {
+      this.error.set('Failed to convert to Plain Text');
+      console.error(err);
+      await this.logErrorToFirestore('toPlainText', err, { filename: file?.name });
+    } finally {
+      this.processingAction.set(null);
+    }
+  }
+
   private downloadFile(content: string, filename: string, type: string) {
+    this.convertedText.set(content);
     const blob = new Blob([content], { type });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -397,6 +442,10 @@ export class App implements OnInit {
     a.download = filename;
     a.click();
     window.URL.revokeObjectURL(url);
+  }
+
+  copyToClipboard(text: string) {
+    navigator.clipboard.writeText(text);
   }
 }
 

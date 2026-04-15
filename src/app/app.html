@@ -33,7 +33,7 @@
                   <p class="text-xs font-semibold text-stone-700 uppercase tracking-wider">Your Data</p>
                 </div>
                 <p class="text-xs text-stone-500 leading-relaxed">
-                  We only store your basic profile info (name, email, profile img URL) and a daily conversion counter (limit 20/day). 
+                  We only store your basic profile info (name, email, profile img URL) and a daily conversion counter (limit 5/day). 
                   User data is automatically deleted the first day of every month at 12:01am.
                   <strong class="font-medium text-stone-700">Your document data is never saved.</strong>
                 </p>
@@ -98,52 +98,120 @@
     <!-- Main Card -->
     <div class="glass-card w-full max-w-2xl p-8 md:p-12 transition-all duration-500 animate-in slide-in-from-bottom-4">
     
-    <!-- Upload Area -->
-    <div 
-      class="relative border-2 border-dashed border-stone-200 rounded-2xl p-12 text-center transition-colors hover:border-stone-400 group cursor-pointer"
-      (click)="fileInput.click()"
-      (keydown.enter)="fileInput.click()"
-      (keydown.space)="fileInput.click()"
-      tabindex="0"
-      role="button"
-      aria-label="Upload file"
-    >
-      <input 
-        #fileInput 
-        type="file" 
-        class="hidden" 
-        (change)="onFileSelected($event)"
-        [accept]="mode() === 'md-to-doc' ? '.md,.txt' : '.docx,.pdf'"
-      >
-      
-      <div class="flex flex-col items-center gap-4">
-        <div class="w-16 h-16 bg-stone-100 rounded-full flex items-center justify-center group-hover:bg-stone-200 transition-colors">
-          <mat-icon class="text-stone-400 group-hover:text-stone-600">cloud_upload</mat-icon>
+    <!-- Markdown Flavor Selector -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 pb-6 border-b border-stone-100">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 bg-stone-50 rounded-xl flex items-center justify-center text-stone-400">
+          <mat-icon>settings_input_component</mat-icon>
         </div>
-        
-        @if (!selectedFile()) {
-          <div>
-            <p class="text-lg font-medium text-stone-700">
-              Click to upload, drag & drop, or paste (Ctrl+V)
-            </p>
-            <p class="text-sm text-stone-400 mt-1">
-              {{ mode() === 'md-to-doc' ? 'Supports .md, .txt, or pasted text' : 'Supports .docx, .pdf, or pasted rich text' }}
-            </p>
+        <div>
+          <h3 class="text-sm font-semibold text-stone-900">Markdown Flavor</h3>
+          <p class="text-[10px] text-stone-400 uppercase tracking-wider font-medium">Input & Output Syntax</p>
+        </div>
+      </div>
+      <select 
+        (change)="markdownFlavor.set($any($event.target).value)"
+        [value]="markdownFlavor()"
+        class="bg-stone-100 text-stone-900 text-xs font-medium px-4 py-2 rounded-xl border-none focus:ring-2 focus:ring-stone-400 cursor-pointer"
+      >
+        <option value="auto">Auto (Recommended)</option>
+        <option value="original">Original (Gruber)</option>
+        <option value="commonmark">CommonMark</option>
+        <option value="multimarkdown">MultiMarkdown</option>
+        <option value="gfm">GitHub Flavored (GFM)</option>
+        <option value="stackoverflow">Stack Overflow</option>
+        <option value="reddit">Reddit (Snudown)</option>
+        <option value="pandoc">Pandoc</option>
+        <option value="kramdown">Kramdown</option>
+        <option value="mdx">MDX</option>
+        <option value="obsidian">Obsidian / Foam</option>
+      </select>
+    </div>
+    
+    <!-- Upload Area -->
+    @if (!selectedFile()) {
+      <div class="flex flex-col gap-4">
+        <div 
+          class="relative border-2 border-dashed border-stone-200 rounded-2xl p-8 text-center transition-colors hover:border-stone-400 group cursor-pointer bg-white"
+          (click)="fileInput.click()"
+          (keydown.enter)="fileInput.click()"
+          (keydown.space)="fileInput.click()"
+          tabindex="0"
+          role="button"
+          aria-label="Upload file"
+        >
+          <input 
+            #fileInput 
+            type="file" 
+            class="hidden" 
+            (change)="onFileSelected($event)"
+            [accept]="mode() === 'md-to-doc' ? '.md,.txt' : '.docx,.pdf,.txt,.html'"
+          >
+          <div class="w-12 h-12 bg-stone-100 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-stone-200 transition-colors">
+            <mat-icon class="text-stone-400 group-hover:text-stone-600">cloud_upload</mat-icon>
           </div>
-        } @else {
-          <div class="animate-in zoom-in duration-300">
+          <p class="text-base font-medium text-stone-700">Click to upload or drag & drop</p>
+          <p class="text-xs text-stone-400 mt-1">
+            @if (mode() === 'md-to-doc') {
+              Upload <strong>.md</strong> or <strong>.txt</strong> to convert to Doc/PDF
+            } @else {
+              Upload <strong>.docx</strong>, <strong>.pdf</strong>, <strong>.html</strong>, or <strong>.txt</strong> to convert to Markdown
+            }
+          </p>
+        </div>
+
+        <div class="flex items-center gap-4 my-2">
+          <div class="h-px bg-stone-200 flex-1"></div>
+          <span class="text-xs text-stone-400 font-medium uppercase tracking-wider">OR</span>
+          <div class="h-px bg-stone-200 flex-1"></div>
+        </div>
+
+        <textarea
+          id="main-paste-area"
+          rows="3"
+          class="w-full border-2 border-stone-200 rounded-2xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-stone-400 focus:border-transparent resize-none transition-all placeholder:text-stone-400 bg-white"
+          placeholder="Paste your text here..."
+          (input)="onTextInput($event)"
+        ></textarea>
+      </div>
+    } @else {
+      <div class="relative border-2 border-dashed border-stone-200 rounded-2xl p-12 text-center bg-white">
+        <div class="flex flex-col items-center gap-4 animate-in zoom-in duration-300">
+          <div class="w-16 h-16 bg-stone-100 rounded-full flex items-center justify-center">
+            <mat-icon class="text-stone-600">insert_drive_file</mat-icon>
+          </div>
+          <div>
             <p class="text-lg font-medium text-stone-900">{{ selectedFile()?.name }}</p>
             <p class="text-xs text-stone-400 uppercase tracking-widest mt-1">File Selected</p>
           </div>
-        }
+        </div>
       </div>
-    </div>
+    }
 
     <!-- Error Message -->
     @if (error()) {
       <div class="mt-6 p-4 bg-red-50 text-red-600 rounded-xl text-sm flex items-center gap-2 animate-in slide-in-from-bottom-2">
         <mat-icon class="text-sm">error_outline</mat-icon>
         {{ error() }}
+      </div>
+    }
+
+    <!-- Copyable Code Block -->
+    @if (convertedText()) {
+      <div class="mt-8 animate-in slide-in-from-bottom-4 duration-500">
+        <div class="flex items-center justify-between mb-2">
+          <h4 class="text-xs font-semibold text-stone-500 uppercase tracking-wider">Result</h4>
+          <button 
+            (click)="copyToClipboard(convertedText()!)"
+            class="text-xs font-medium text-stone-500 hover:text-stone-900 flex items-center gap-1 transition-colors"
+          >
+            <mat-icon class="text-xs scale-75">content_copy</mat-icon>
+            Copy
+          </button>
+        </div>
+        <div class="bg-stone-950 text-stone-300 p-4 rounded-xl text-xs font-mono overflow-x-auto max-h-64">
+          <pre><code>{{ convertedText() }}</code></pre>
+        </div>
       </div>
     }
 
@@ -160,7 +228,7 @@
             Sign in with Google to Convert
           </button>
         } @else if (mode() === 'md-to-doc') {
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <button 
               (click)="convertToPdf()"
               [disabled]="processingAction() !== null"
@@ -170,7 +238,7 @@
                 <div class="spinner"></div>
               } @else {
                 <mat-icon>picture_as_pdf</mat-icon>
-                Download PDF
+                PDF
               }
             </button>
             <button 
@@ -182,23 +250,49 @@
                 <div class="spinner-dark"></div>
               } @else {
                 <mat-icon>description</mat-icon>
-                Download Word
+                Word
+              }
+            </button>
+            <button 
+              (click)="convertToText()"
+              [disabled]="processingAction() !== null"
+              class="flex items-center justify-center gap-3 bg-white border-2 border-stone-300 shadow-sm text-stone-900 py-4 rounded-xl font-medium hover:bg-stone-50 hover:border-stone-400 disabled:opacity-50 transition-all active:scale-95"
+            >
+              @if (processingAction() === 'txt') {
+                <div class="spinner-dark"></div>
+              } @else {
+                <mat-icon>article</mat-icon>
+                Plain Text
               }
             </button>
           </div>
         } @else {
-          <button 
-            (click)="convertToMarkdown()"
-            [disabled]="processingAction() !== null"
-            class="flex items-center justify-center gap-3 bg-stone-900 text-white py-4 rounded-xl font-medium hover:bg-stone-800 disabled:opacity-50 transition-all active:scale-95"
-          >
-            @if (processingAction() === 'md') {
-              <div class="spinner"></div>
-            } @else {
-              <mat-icon>code</mat-icon>
-              Convert to Markdown
-            }
-          </button>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <button 
+              (click)="convertToMarkdown()"
+              [disabled]="processingAction() !== null"
+              class="flex items-center justify-center gap-3 bg-stone-900 text-white py-4 rounded-xl font-medium hover:bg-stone-800 disabled:opacity-50 transition-all active:scale-95"
+            >
+              @if (processingAction() === 'md') {
+                <div class="spinner"></div>
+              } @else {
+                <mat-icon>code</mat-icon>
+                Markdown
+              }
+            </button>
+            <button 
+              (click)="convertToText()"
+              [disabled]="processingAction() !== null"
+              class="flex items-center justify-center gap-3 bg-white border-2 border-stone-300 shadow-sm text-stone-900 py-4 rounded-xl font-medium hover:bg-stone-50 hover:border-stone-400 disabled:opacity-50 transition-all active:scale-95"
+            >
+              @if (processingAction() === 'txt') {
+                <div class="spinner-dark"></div>
+              } @else {
+                <mat-icon>article</mat-icon>
+                Plain Text
+              }
+            </button>
+          </div>
         }
 
         <button 
