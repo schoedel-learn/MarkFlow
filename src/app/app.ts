@@ -233,6 +233,12 @@ export class App implements OnInit {
     const clipboardData = event.clipboardData;
     if (!clipboardData) return;
 
+    if (target.tagName === 'TEXTAREA') {
+      setTimeout(() => {
+        (target as HTMLTextAreaElement).value = '';
+      }, 500);
+    }
+
     if (this.mode() === 'md-to-doc') {
       const text = clipboardData.getData('text/plain');
       if (text) {
