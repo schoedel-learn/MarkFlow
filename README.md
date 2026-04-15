@@ -40,7 +40,7 @@ MarkFlow is an Angular-based document conversion app focused on Markdown workflo
    ```bash
    npm install
    ```
-2. Set your Gemini API key in `angular.json` (replace `YOUR_GEMINI_API_KEY`).
+2. Configure your Gemini API key through a local, non-committed configuration method (for example, local environment files or CI/CD environment variables).
 3. Start the dev server:
    ```bash
    npm run dev
@@ -60,4 +60,4 @@ MarkFlow is an Angular-based document conversion app focused on Markdown workflo
 ## Notes
 
 - Firebase runtime configuration is loaded from `firebase-applet-config.json`.
-- This repository currently includes Firebase project settings; use your own project config for production environments.
+- Use your own Firebase project settings and keep sensitive configuration outside version control for production deployments.
