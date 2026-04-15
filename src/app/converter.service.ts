@@ -83,7 +83,7 @@ export class ConverterService {
       // Use AI for better quality conversion if possible
       const ai = this.getAiClient();
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-3.1-flash-lite-preview',
         contents: `Convert the following HTML into clean, well-formatted Markdown using ${flavor === 'commonmark' ? 'CommonMark' : 'GitHub Flavored Markdown'} syntax. Preserve headings, lists, bold, italics, and links. Do not include any conversational text, just output the Markdown.\n\nHTML:\n${html}`,
       });
       return response.text || this.getTurndownService(flavor).turndown(html);
@@ -653,7 +653,7 @@ export class ConverterService {
       // Use AI to convert the HTML to clean Markdown
       const ai = this.getAiClient();
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-3.1-flash-lite-preview',
         contents: `Convert the following HTML extracted from a Word document into clean, well-formatted Markdown using ${flavor === 'auto' ? 'GitHub Flavored Markdown' : flavor} syntax. Preserve headings, lists, bold, italics, and links. Do not include any conversational text, just output the Markdown.\n\nHTML:\n${html}`,
       });
       
@@ -684,7 +684,7 @@ export class ConverterService {
       console.info('[pdfToMd] Requesting AI conversion from PDF to Markdown...');
       const ai = this.getAiClient();
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-3.1-flash-lite-preview',
         contents: {
           parts: [
             {
