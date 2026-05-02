@@ -1,0 +1,31 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.uid == userId;
+      allow update: if isOwner(userId) && request.resource.data.uid == resource.data.uid;
+      allow delete: if false; // Users cannot delete their profiles directly
+    }
+    match /conversion_errors/{errorId} {
+      allow create: if isAuthenticated();
+      allow read, update, delete: if false;
+    }
+    match /bug_reports/{reportId} {
+      allow create: if isAuthenticated();
+      allow read, update, delete: if false;
+    }
+    match /stats/{statId} {
+      allow create, update: if isAuthenticated();
+      allow read, delete: if false;
+    }
+  }
+}
