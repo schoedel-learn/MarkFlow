@@ -1,7 +1,14 @@
 import argparse
 from pathlib import Path
+import sys
 
-import pymupdf4llm
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from pdf_pipeline import extract_raw_markdown
 
 
 def parse_args() -> argparse.Namespace:
@@ -30,8 +37,9 @@ def main() -> int:
         return 1
 
     output_path = build_output_path(pdf_path, args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     print(f"Extracting {pdf_path}...")
-    md_text = pymupdf4llm.to_markdown(str(pdf_path))
+    md_text = extract_raw_markdown(pdf_path)
     output_path.write_text(md_text, encoding="utf-8")
     print(f"Done. Saved to {output_path}")
     return 0

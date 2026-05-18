@@ -48,3 +48,26 @@ Recommended variable settings:
 If you need to deploy manually from a machine that already has Firebase credentials configured:
 
 `npm run build:prod && npm run deploy:hosting`
+
+## PDF utility scripts
+
+The repository also includes two Python utility scripts under `markflow-api/scripts/` for offline PDF-to-Markdown workflows.
+
+Install the Python dependencies first:
+
+`pip install -r markflow-api/requirements.txt`
+
+Extract raw Markdown from a PDF:
+
+`python markflow-api/scripts/extract_pdf_raw.py path/to/file.pdf`
+
+Generate cleaned Markdown with Gemini formatting:
+
+`GEMINI_API_KEY=your-key python markflow-api/scripts/improve_pdf_markdown.py path/to/file.pdf`
+
+Optional flags for the improved formatter:
+
+- `-o, --output` to choose the output path
+- `--chunk-size` to control pages per Gemini request
+- `--max-pages` to cap processing for partial runs
+- `--model` to select a different Gemini model
