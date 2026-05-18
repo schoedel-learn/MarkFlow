@@ -58,8 +58,9 @@ export class ConverterService {
     }
   }
 
-  private getAiClient(): GoogleGenAI {
-    return new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+  private getAiClient(apiKey: string): GoogleGenAI {
+    if (!apiKey) throw new Error('API key is required for this operation.');
+    return new GoogleGenAI({ apiKey });
   }
 
   async mdToHtml(md: string, flavor: MarkdownFlavor = 'auto'): Promise<string> {
@@ -77,13 +78,17 @@ export class ConverterService {
     }
   }
 
-  async htmlToMd(html: string, flavor: MarkdownFlavor = 'auto'): Promise<string> {
+  async htmlToMd(html: string, flavor: MarkdownFlavor = 'auto', apiKey?: string): Promise<string> {
     console.info(`[htmlToMd] Converting HTML to Markdown (${flavor})...`);
     try {
+      if (!apiKey) {
+        console.info('[htmlToMd] No API key provided, falling back to Turndown.');
+        return this.getTurndownService(flavor).turndown(html);
+      }
       // Use AI for better quality conversion if possible
-      const ai = this.getAiClient();
+      const ai = this.getAiClient(apiKey);
       const response = await ai.models.generateContent({
-        model: 'gemini-3.1-flash-lite-preview',
+        model: 'gemini-3.1-pro-preview',
         contents: `Convert the following HTML into clean, well-formatted Markdown using ${flavor === 'commonmark' ? 'CommonMark' : 'GitHub Flavored Markdown'} syntax. Preserve headings, lists, bold, italics, and links. Do not include any conversational text, just output the Markdown.\n\nHTML:\n${html}`,
       });
       return response.text || this.getTurndownService(flavor).turndown(html);
@@ -95,6 +100,45 @@ export class ConverterService {
         console.error('[htmlToMd] Fallback conversion failed:', fallbackError);
         throw new Error(`Failed to convert HTML to Markdown: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown error'}`);
       }
+    }
+  }
+
+  async textToMd(text: string, flavor: MarkdownFlavor = 'auto', apiKey?: string): Promise<string> {
+    console.info(`[textToMd] Converting plain text to Markdown (${flavor})...`);
+    try {
+      if (!apiKey) {
+        console.warn('[textToMd] No API key provided. Returning raw text as-is.');
+        return text;
+      }
+
+      const ai = this.getAiClient(apiKey);
+      const flavorName = flavor === 'auto' ? 'GitHub Flavored Markdown' : flavor;
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.1-pro-preview',
+        contents: `You are a document formatting expert. Convert the following plain text into clean, well-structured ${flavorName} Markdown.
+
+RULES:
+1. Analyze the text structure and add appropriate Markdown formatting: headings, lists, bold, italics, code blocks, tables, blockquotes, etc.
+2. DO NOT summarize, truncate, or remove any content. Every word must be preserved.
+3. DO NOT add any conversational filler or explanations. Output ONLY the formatted Markdown.
+4. If the text already appears to be Markdown, clean it up and ensure proper syntax.
+5. Intelligently detect structure: titles become headings, enumerated items become lists, emphasized words get bold/italic, etc.
+
+PLAIN TEXT:
+${text}`,
+      });
+
+      const result = response.text;
+      if (result && result.trim()) {
+        console.info('[textToMd] AI conversion completed successfully.');
+        return result;
+      }
+
+      console.warn('[textToMd] AI returned empty response. Returning raw text.');
+      return text;
+    } catch (error) {
+      console.error('[textToMd] AI conversion failed, returning raw text:', error);
+      return text;
     }
   }
 
@@ -114,10 +158,13 @@ export class ConverterService {
       container.style.width = '672px'; // 7 inches at 96 DPI
       container.style.backgroundColor = '#ffffff';
       container.style.color = '#1c1917';
-      container.style.position = 'absolute';
+      // Position off-screen so it doesn't affect layout but is still laid out
+      // by the browser (display:none would give a 0-height capture).
+      container.style.position = 'fixed';
       container.style.top = '0';
-      container.style.left = '0';
+      container.style.left = '-10000px';
       container.style.zIndex = '-9999';
+      container.style.pointerEvents = 'none';
       
       container.innerHTML = `
         <style>
@@ -284,69 +331,116 @@ export class ConverterService {
       console.info(`[mdToPdf] Image loading complete. Loaded: ${loadedCount}, Failed: ${failedCount}`);
 
       console.info('[mdToPdf] Waiting for styles and fonts to apply...');
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Try to wait for webfonts; fall back to timeout if FontFaceSet not available.
+      try {
+        const fonts = (document as unknown as { fonts?: { ready: Promise<unknown> } }).fonts;
+        if (fonts?.ready) {
+          await Promise.race([
+            fonts.ready,
+            new Promise(resolve => setTimeout(resolve, 1500)),
+          ]);
+        } else {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      } catch {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
 
-      console.info('[mdToPdf] Initializing jsPDF and html2canvas...');
-      (window as unknown as { html2canvas: typeof html2canvas }).html2canvas = html2canvas;
-      
+      console.info('[mdToPdf] Rasterizing container with html2canvas...');
+      const contentEl = container.querySelector('.pdf-content') as HTMLElement | null;
+      const captureTarget = contentEl ?? container;
+      const canvas = await html2canvas(captureTarget, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        windowWidth: 672,
+      });
+
+      if (!canvas.width || !canvas.height) {
+        throw new Error('html2canvas produced an empty canvas.');
+      }
+      console.info(`[mdToPdf] Canvas rendered: ${canvas.width}x${canvas.height}px`);
+
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'in',
-        format: 'letter'
+        format: 'letter',
       });
 
-      console.info('[mdToPdf] Rendering HTML to PDF via jsPDF...');
-      await new Promise<void>((resolve, reject) => {
-        pdf.html(container!, {
-          margin: [1, 0.75, 1, 0.75], // Top, Left, Bottom, Right
-          autoPaging: 'text',
-          x: 0,
-          y: 0,
-          width: 7, // 8.5 - (0.75 * 2)
-          windowWidth: 672, // 7 * 96
-          html2canvas: {
-            scale: 2,
-            useCORS: true,
-            logging: false,
-            backgroundColor: '#ffffff'
-          },
-          callback: function (doc: jsPDF) {
-            try {
-              console.info('[mdToPdf] Adding page numbers and footer...');
-              const pageCount = doc.getNumberOfPages();
-              for (let i = 1; i <= pageCount; i++) {
-                doc.setPage(i);
-                doc.setFontSize(9);
-                doc.setTextColor(168, 162, 158); // stone-400
-                
-                // Footer
-                doc.text(
-                  `Page ${i} of ${pageCount}`, 
-                  4.25, 10.5, 
-                  { align: 'center' }
-                );
-                
-                doc.text(
-                  'Generated by MarkFlow', 
-                  0.75, 10.5, 
-                  { align: 'left' }
-                );
-              }
+      // Page layout (inches)
+      const pageWidth = 8.5;
+      const pageHeight = 11;
+      const marginTop = 1;
+      const marginBottom = 1;
+      const marginLeft = 0.75;
+      const marginRight = 0.75;
+      const contentWidth = pageWidth - marginLeft - marginRight; // 7"
+      const contentHeight = pageHeight - marginTop - marginBottom; // 9"
 
-              console.info('[mdToPdf] Saving PDF file...');
-              doc.save(filename.replace(/\.(md|txt)$/, '.pdf'));
-              console.info('[mdToPdf] PDF generation completed successfully.');
-              resolve();
-            } catch (saveError) {
-              console.error('[mdToPdf] Error saving PDF file:', saveError);
-              reject(new Error(`Failed to save PDF: ${saveError instanceof Error ? saveError.message : 'Unknown error'}`));
-            }
-          }
-        } as unknown as Parameters<typeof pdf.html>[1]).catch((renderError) => {
-          console.error('[mdToPdf] Error during HTML rendering:', renderError);
-          reject(new Error(`Failed to render HTML to PDF: ${renderError instanceof Error ? renderError.message : 'Unknown error'}`));
-        });
-      });
+      // Compute the image height in inches if drawn at contentWidth.
+      const pxPerInch = canvas.width / contentWidth;
+      const totalImgHeightIn = canvas.height / pxPerInch;
+      const pageSliceHeightPx = Math.floor(contentHeight * pxPerInch);
+
+      // Sanity guard against runaway page counts.
+      const estimatedPages = Math.ceil(totalImgHeightIn / contentHeight);
+      console.info(`[mdToPdf] Estimated PDF pages: ${estimatedPages}`);
+      if (estimatedPages > 500) {
+        throw new Error(`Unexpected page count (${estimatedPages}). Aborting to avoid generating a corrupt PDF.`);
+      }
+
+      // Slice the source canvas into page-sized chunks and add each as its own image.
+      let yOffsetPx = 0;
+      let pageIndex = 0;
+      while (yOffsetPx < canvas.height) {
+        const sliceHeightPx = Math.min(pageSliceHeightPx, canvas.height - yOffsetPx);
+        const sliceCanvas = document.createElement('canvas');
+        sliceCanvas.width = canvas.width;
+        sliceCanvas.height = sliceHeightPx;
+        const ctx = sliceCanvas.getContext('2d');
+        if (!ctx) {
+          throw new Error('Could not get 2D context for page slicing.');
+        }
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+        ctx.drawImage(
+          canvas,
+          0, yOffsetPx, canvas.width, sliceHeightPx,
+          0, 0, canvas.width, sliceHeightPx,
+        );
+        const sliceData = sliceCanvas.toDataURL('image/jpeg', 0.92);
+
+        if (pageIndex > 0) {
+          pdf.addPage();
+        }
+        const sliceHeightIn = sliceHeightPx / pxPerInch;
+        pdf.addImage(
+          sliceData,
+          'JPEG',
+          marginLeft,
+          marginTop,
+          contentWidth,
+          sliceHeightIn,
+        );
+
+        yOffsetPx += sliceHeightPx;
+        pageIndex += 1;
+      }
+
+      console.info('[mdToPdf] Adding page numbers and footer...');
+      const pageCount = pdf.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        pdf.setPage(i);
+        pdf.setFontSize(9);
+        pdf.setTextColor(168, 162, 158); // stone-400
+        pdf.text(`Page ${i} of ${pageCount}`, pageWidth / 2, pageHeight - 0.5, { align: 'center' });
+        pdf.text('Generated by MarkFlow', marginLeft, pageHeight - 0.5, { align: 'left' });
+      }
+
+      console.info('[mdToPdf] Saving PDF file...');
+      pdf.save(filename.replace(/\.(md|txt)$/, '.pdf'));
+      console.info('[mdToPdf] PDF generation completed successfully.');
       
     } catch (error) {
       console.error('[mdToPdf] Fatal PDF Conversion Error:', error);
@@ -639,7 +733,7 @@ export class ConverterService {
     }
   }
 
-  async docxToMd(file: File, flavor: MarkdownFlavor = 'auto'): Promise<string> {
+  async docxToMd(file: File, flavor: MarkdownFlavor = 'auto', apiKey?: string): Promise<string> {
     console.info(`[docxToMd] Starting conversion for file: ${file.name}`);
     try {
       console.info('[docxToMd] Reading file array buffer...');
@@ -649,11 +743,16 @@ export class ConverterService {
       const result = await mammoth.convertToHtml({ arrayBuffer });
       const html = result.value;
       
+      if (!apiKey) {
+        console.info('[docxToMd] No API key provided, falling back to Turndown.');
+        return this.getTurndownService(flavor).turndown(html);
+      }
+
       console.info('[docxToMd] Requesting AI conversion from HTML to Markdown...');
       // Use AI to convert the HTML to clean Markdown
-      const ai = this.getAiClient();
+      const ai = this.getAiClient(apiKey);
       const response = await ai.models.generateContent({
-        model: 'gemini-3.1-flash-lite-preview',
+        model: 'gemini-3.1-pro-preview',
         contents: `Convert the following HTML extracted from a Word document into clean, well-formatted Markdown using ${flavor === 'auto' ? 'GitHub Flavored Markdown' : flavor} syntax. Preserve headings, lists, bold, italics, and links. Do not include any conversational text, just output the Markdown.\n\nHTML:\n${html}`,
       });
       
@@ -665,50 +764,42 @@ export class ConverterService {
     }
   }
 
-  async pdfToMd(file: File, flavor: MarkdownFlavor = 'auto'): Promise<string> {
-    console.info(`[pdfToMd] Starting conversion for file: ${file.name}`);
+  async pdfToMd(file: File, flavor: MarkdownFlavor = 'auto', apiKey?: string): Promise<string> {
+    console.info(`[pdfToMd] Starting backend conversion for file: ${file.name}`);
     try {
-      console.info('[pdfToMd] Reading file as base64...');
-      const base64String = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = reader.result as string;
-          // Remove the data URL prefix (e.g., "data:application/pdf;base64,")
-          const base64 = result.split(',')[1];
-          resolve(base64);
-        };
-        reader.onerror = () => reject(new Error('Failed to read PDF file'));
-        reader.readAsDataURL(file);
-      });
-      
-      console.info('[pdfToMd] Requesting AI conversion from PDF to Markdown...');
-      const ai = this.getAiClient();
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.1-flash-lite-preview',
-        contents: {
-          parts: [
-            {
-              inlineData: {
-                data: base64String,
-                mimeType: 'application/pdf'
-              }
-            },
-            {
-              text: `Extract the text from this PDF and format it as clean Markdown using ${flavor === 'auto' ? 'GitHub Flavored Markdown' : flavor} syntax. Preserve the structure, headings, lists, and paragraphs. Do not include any conversational text, just output the Markdown.`
-            }
-          ]
-        }
+      if (!apiKey) throw new Error('API key is required for PDF conversion.');
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('api_key', apiKey);
+      formData.append('flavor', flavor);
+
+      console.info('[pdfToMd] Sending PDF to backend API...');
+      const response = await fetch('https://api.md.schoedeldesign.ai/convert/pdf', {
+        method: 'POST',
+        body: formData
       });
 
-      console.info('[pdfToMd] AI conversion completed successfully.');
-      return response.text || '';
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Server error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (!data.markdown || data.markdown.trim() === '') {
+        throw new Error('Backend returned an empty response.');
+      }
+
+      console.info('[pdfToMd] Backend conversion completed successfully.');
+      return data.markdown;
     } catch (error) {
       console.error('[pdfToMd] Fatal PDF to MD Conversion Error:', error);
       throw new Error(`Failed to convert PDF to MD: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
-  async toPlainText(content: string | File): Promise<string> {
+  async toPlainText(content: string | File, apiKey?: string): Promise<string> {
     console.info('[toPlainText] Converting to plain text...');
     try {
       if (typeof content === 'string') {
@@ -725,7 +816,7 @@ export class ConverterService {
           return result.value;
         } else if (file.name.endsWith('.pdf')) {
           // For PDF to text, we can use AI for better extraction or just return the markdown version stripped
-          const md = await this.pdfToMd(file);
+          const md = await this.pdfToMd(file, 'auto', apiKey);
           return md.replace(/[#*`_~[\]()]/g, '');
         } else if (file.name.endsWith('.html')) {
           const html = await file.text();

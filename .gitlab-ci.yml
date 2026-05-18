@@ -1,0 +1,44 @@
+image: node:22
+
+stages:
+  - build
+  - deploy
+
+variables:
+  NPM_CONFIG_CACHE: "$CI_PROJECT_DIR/.npm"
+  FIREBASE_PROJECT_ID: "gen-lang-client-0879285190"
+
+cache:
+  key: "$CI_COMMIT_REF_SLUG"
+  paths:
+    - .npm/
+
+build_app:
+  stage: build
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+  script:
+    - npm ci --cache .npm --prefer-offline
+    - npm run build:prod
+  artifacts:
+    expire_in: 1 week
+    paths:
+      - dist/app/browser/
+
+deploy_production:
+  stage: deploy
+  needs:
+    - job: build_app
+      artifacts: true
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+  script:
+    - test -n "$FIREBASE_SERVICE_ACCOUNT" || (echo "FIREBASE_SERVICE_ACCOUNT is not set" && exit 1)
+    - |
+      if [[ -f "$FIREBASE_SERVICE_ACCOUNT" ]]; then
+        export GOOGLE_APPLICATION_CREDENTIALS="$FIREBASE_SERVICE_ACCOUNT"
+      else
+        printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$CI_PROJECT_DIR/firebase-service-account.json"
+        export GOOGLE_APPLICATION_CREDENTIALS="$CI_PROJECT_DIR/firebase-service-account.json"
+      fi
+    - npm run deploy:hosting
