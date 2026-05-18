@@ -43,6 +43,10 @@ testem.log
 /typings
 __screenshots__/
 markflow-api/venv/
+/usccb-liturgical-2026cal.pdf
+/usccb-liturgical-2026cal.md
+/usccb-liturgical-2026cal_raw.md
+/usccb-liturgical-2026cal_improved.md
 
 # System files
 .DS_Store
