@@ -1,0 +1,20 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    match /pdf-inputs/{userId}/{jobId}/{fileName} {
+      allow read, write: if isOwner(userId);
+    }
+
+    match /markdown-outputs/{userId}/{jobId}/{fileName} {
+      allow read, write: if isOwner(userId);
+    }
+  }
+}
