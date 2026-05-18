@@ -18,6 +18,12 @@ service firebase.storage {
         && request.resource.metadata == resource.metadata;
     }
 
+    function isZeroBytePlaceholderCreate() {
+      return resource == null
+        && request.resource != null
+        && request.resource.size == 0;
+    }
+
     match /pdf-inputs/{userId}/{jobId}/{fileName} {
       allow read: if isOwner(userId);
       allow write: if isOwner(userId)
@@ -27,7 +33,7 @@ service firebase.storage {
     match /markdown-outputs/{userId}/{jobId}/{fileName} {
       allow read: if isOwner(userId);
       allow write: if isOwner(userId)
-        && isSameObjectWrite();
+        && (isZeroBytePlaceholderCreate() || isSameObjectWrite());
     }
   }
 }
