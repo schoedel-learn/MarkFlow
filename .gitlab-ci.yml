@@ -33,9 +33,11 @@ deploy_production:
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
   script:
-    - test -n "$FIREBASE_SERVICE_ACCOUNT" || (echo "FIREBASE_SERVICE_ACCOUNT is not set" && exit 1)
+    - test -n "$FIREBASE_TOKEN$FIREBASE_SERVICE_ACCOUNT" || (echo "Neither FIREBASE_TOKEN nor FIREBASE_SERVICE_ACCOUNT is set" && exit 1)
     - |
-      if [[ -f "$FIREBASE_SERVICE_ACCOUNT" ]]; then
+      if [[ -n "$FIREBASE_TOKEN" ]]; then
+        export FIREBASE_TOKEN
+      elif [[ -f "$FIREBASE_SERVICE_ACCOUNT" ]]; then
         export GOOGLE_APPLICATION_CREDENTIALS="$FIREBASE_SERVICE_ACCOUNT"
       else
         printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$CI_PROJECT_DIR/firebase-service-account.json"
