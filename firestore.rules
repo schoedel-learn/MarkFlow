@@ -25,7 +25,8 @@ service cloud.firestore {
       allow create: if isAuthenticated()
         && request.resource.data.userId == request.auth.uid;
       allow read, update: if isAuthenticated()
-        && resource.data.userId == request.auth.uid;
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == resource.data.userId;
       allow delete: if false;
     }
     match /conversion_errors/{errorId} {
