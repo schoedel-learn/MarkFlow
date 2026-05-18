@@ -8,6 +8,26 @@ service cloud.firestore {
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
+    function hasOnlyJobCreateFields() {
+      return request.resource.data.keys().hasOnly([
+        'userId',
+        'originalFilename',
+        'sizeBytes',
+        'pageCount',
+        'inputKind'
+      ]);
+    }
+    function isValidJobCreate() {
+      return hasOnlyJobCreateFields()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.originalFilename is string
+        && request.resource.data.originalFilename.size() > 0
+        && request.resource.data.sizeBytes is int
+        && request.resource.data.sizeBytes > 0
+        && request.resource.data.pageCount is int
+        && request.resource.data.pageCount > 0
+        && request.resource.data.inputKind == 'pdf';
+    }
 
     match /users/{userId} {
       allow read: if isOwner(userId);
@@ -23,12 +43,10 @@ service cloud.firestore {
     }
     match /conversion_jobs/{jobId} {
       allow create: if isAuthenticated()
-        && request.resource.data.userId == request.auth.uid;
+        && isValidJobCreate();
       allow read: if isAuthenticated()
         && resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated()
-        && resource.data.userId == request.auth.uid
-        && request.resource.data.userId == resource.data.userId;
+      allow update: if false;
       allow delete: if false;
     }
     match /conversion_errors/{errorId} {

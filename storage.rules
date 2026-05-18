@@ -10,11 +10,14 @@ service firebase.storage {
     }
 
     match /pdf-inputs/{userId}/{jobId}/{fileName} {
-      allow read, write: if isOwner(userId);
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update, delete: if false;
     }
 
     match /markdown-outputs/{userId}/{jobId}/{fileName} {
-      allow read, write: if isOwner(userId);
+      allow read: if isOwner(userId);
+      allow write: if false;
     }
   }
 }
