@@ -18,9 +18,10 @@ service firebase.storage {
         && request.resource.metadata == resource.metadata;
     }
 
-    function isZeroBytePlaceholderCreate() {
+    function isZeroBytePlaceholderCreate(fileName) {
       return resource == null
         && request.resource != null
+        && fileName == '_placeholder'
         && request.resource.size == 0;
     }
 
@@ -33,7 +34,7 @@ service firebase.storage {
     match /markdown-outputs/{userId}/{jobId}/{fileName} {
       allow read: if isOwner(userId);
       allow write: if isOwner(userId)
-        && (isZeroBytePlaceholderCreate() || isSameObjectWrite());
+        && (isZeroBytePlaceholderCreate(fileName) || isSameObjectWrite());
     }
   }
 }

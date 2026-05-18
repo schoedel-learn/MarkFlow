@@ -11,22 +11,45 @@ service cloud.firestore {
     function hasOnlyJobCreateFields() {
       return request.resource.data.keys().hasOnly([
         'userId',
+        'userEmail',
+        'source',
+        'status',
+        'mode',
         'originalFilename',
         'sizeBytes',
         'pageCount',
-        'inputKind'
+        'inputKind',
+        'storageInputPath',
+        'createdAt',
+        'updatedAt',
+        'expiresAt'
       ]);
+    }
+    function hasAuthenticatedEmail() {
+      return request.auth.token.email != null
+        && request.auth.token.email is string
+        && request.auth.token.email.size() > 0;
     }
     function isValidJobCreate() {
       return hasOnlyJobCreateFields()
         && request.resource.data.userId == request.auth.uid
+        && hasAuthenticatedEmail()
+        && request.resource.data.userEmail == request.auth.token.email
+        && request.resource.data.source == 'approved_server'
+        && request.resource.data.status == 'queued'
+        && request.resource.data.mode == 'background'
         && request.resource.data.originalFilename is string
         && request.resource.data.originalFilename.size() > 0
         && request.resource.data.sizeBytes is int
         && request.resource.data.sizeBytes > 0
         && request.resource.data.pageCount is int
         && request.resource.data.pageCount > 0
-        && request.resource.data.inputKind == 'pdf';
+        && request.resource.data.inputKind == 'pdf'
+        && request.resource.data.storageInputPath is string
+        && request.resource.data.storageInputPath.size() > 0
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp
+        && request.resource.data.expiresAt is timestamp;
     }
     function isOwnerJobUpdate() {
       return resource.data.userId == request.auth.uid
