@@ -9,15 +9,25 @@ service firebase.storage {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    function isSameObjectWrite() {
+      return resource != null
+        && request.resource != null
+        && request.resource.size == resource.size
+        && request.resource.md5Hash == resource.md5Hash
+        && request.resource.contentType == resource.contentType
+        && request.resource.metadata == resource.metadata;
+    }
+
     match /pdf-inputs/{userId}/{jobId}/{fileName} {
       allow read: if isOwner(userId);
-      allow create: if isOwner(userId);
-      allow update, delete: if false;
+      allow write: if isOwner(userId)
+        && (resource == null || isSameObjectWrite());
     }
 
     match /markdown-outputs/{userId}/{jobId}/{fileName} {
       allow read: if isOwner(userId);
-      allow write: if false;
+      allow write: if isOwner(userId)
+        && isSameObjectWrite();
     }
   }
 }

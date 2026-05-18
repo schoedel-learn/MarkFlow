@@ -28,6 +28,11 @@ service cloud.firestore {
         && request.resource.data.pageCount > 0
         && request.resource.data.inputKind == 'pdf';
     }
+    function isOwnerJobUpdate() {
+      return resource.data.userId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['updatedAt'])
+        && request.resource.data.updatedAt == request.time;
+    }
 
     match /users/{userId} {
       allow read: if isOwner(userId);
@@ -46,7 +51,8 @@ service cloud.firestore {
         && isValidJobCreate();
       allow read: if isAuthenticated()
         && resource.data.userId == request.auth.uid;
-      allow update: if false;
+      allow update: if isAuthenticated()
+        && isOwnerJobUpdate();
       allow delete: if false;
     }
     match /conversion_errors/{errorId} {
