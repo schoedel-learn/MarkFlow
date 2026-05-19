@@ -359,8 +359,7 @@ export class CoreStateService {
         allowServerManagedPdf = (await this.resolveEntitlementMode({ forceRefresh: true })) === 'approved_server';
       } catch (e) {
         console.error('Error resolving entitlement mode', e);
-        this.error.set('Could not verify conversion access. Please try again.');
-        return;
+        this.entitlementMode.set('public_byok');
       }
     }
 

@@ -130,6 +130,20 @@ describe('CoreStateService', () => {
     expect(service.error()).toBeNull();
     expect(converter.pdfToMd).toHaveBeenCalledTimes(2);
   });
+
+  it('falls back to public_byok when PDF entitlement refresh fails', async () => {
+    vi.mocked(entitlement.resolveMode).mockRejectedValue(new Error('lookup failed'));
+    vi.mocked(converter.inspectPdf).mockResolvedValue({ pageCount: 1, sizeBytes: 1024 });
+    vi.mocked(converter.pdfToMd).mockResolvedValue('# converted');
+    service.selectedFile.set(new File(['pdf'], 'fallback.pdf', { type: 'application/pdf' }));
+
+    await service.convertToMarkdown({ showProfileMenuFn: vi.fn() });
+
+    expect(service.entitlementMode()).toBe('public_byok');
+    expect(service.error()).toBeNull();
+    expect(converter.inspectPdf).toHaveBeenCalledTimes(1);
+    expect(converter.pdfToMd).toHaveBeenCalledWith(expect.any(File), 'auto', 'test-key');
+  });
 });
 
 describe('EntitlementService', () => {
