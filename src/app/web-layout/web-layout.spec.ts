@@ -72,7 +72,8 @@ describe('WebLayoutComponent', () => {
 
     const text = fixture.nativeElement.textContent;
     expect(text).toContain('approved for server-managed PDF conversion');
-    expect(text).not.toContain('barry@schoedeldesign.ai');
+    // Permanent size-limits card still renders the contact email for everyone.
+    expect(text).toContain('barry@schoedeldesign.ai');
   });
 
   it('shows queued approved PDF background job status', () => {
