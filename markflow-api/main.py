@@ -15,10 +15,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/api/health")
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
 
+@app.post("/api/convert/pdf")
 @app.post("/convert/pdf")
 async def convert_pdf(
     file: UploadFile = File(...),
