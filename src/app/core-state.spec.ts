@@ -5,17 +5,18 @@ import { vi } from 'vitest';
 import { ConverterService } from './converter.service';
 import { CoreStateService } from './core-state';
 import { APPROVED_USER_LOOKUP, EntitlementService } from './entitlement.service';
-import { buildPublicPdfLimitMessage, PUBLIC_PDF_MAX_PAGES } from './pdf-access-policy';
+import { buildPublicPdfLimitMessage, PUBLIC_PDF_MAX_BYTES, PUBLIC_PDF_MAX_PAGES } from './pdf-access-policy';
 
 describe('CoreStateService', () => {
   let service: CoreStateService;
-  let converter: Pick<ConverterService, 'inspectPdf' | 'pdfToMd'>;
+  let converter: Pick<ConverterService, 'inspectPdf' | 'pdfToMd' | 'docxToMd'>;
   let entitlement: Pick<EntitlementService, 'resolveMode'>;
 
   beforeEach(() => {
     converter = {
       inspectPdf: vi.fn(),
-      pdfToMd: vi.fn()
+      pdfToMd: vi.fn(),
+      docxToMd: vi.fn()
     };
     entitlement = {
       resolveMode: vi.fn()
@@ -53,6 +54,20 @@ describe('CoreStateService', () => {
     expect(converter.pdfToMd).not.toHaveBeenCalled();
   });
 
+  it('short-circuits oversized public PDFs before inspection', async () => {
+    vi.mocked(entitlement.resolveMode).mockResolvedValue('public_byok');
+    service.selectedFile.set(new File([new Uint8Array(PUBLIC_PDF_MAX_BYTES + 1)], 'too-large.pdf', { type: 'application/pdf' }));
+
+    await service.convertToMarkdown({ showProfileMenuFn: vi.fn() });
+
+    expect(service.entitlementMode()).toBe('public_byok');
+    expect(service.error()).toBe(buildPublicPdfLimitMessage({
+      sizeBytes: PUBLIC_PDF_MAX_BYTES + 1
+    }));
+    expect(converter.inspectPdf).not.toHaveBeenCalled();
+    expect(converter.pdfToMd).not.toHaveBeenCalled();
+  });
+
   it('lets approved users bypass the public PDF block', async () => {
     vi.mocked(entitlement.resolveMode).mockResolvedValue('approved_server');
     vi.mocked(converter.inspectPdf).mockResolvedValue({ pageCount: PUBLIC_PDF_MAX_PAGES + 100, sizeBytes: 25 * 1024 * 1024 });
@@ -79,6 +94,41 @@ describe('CoreStateService', () => {
     expect(showProfileMenuFn).not.toHaveBeenCalled();
     expect(service.error()).toBeNull();
     expect(converter.pdfToMd).toHaveBeenCalledWith(expect.any(File), 'auto', '');
+  });
+
+  it('does not block non-PDF markdown conversions on entitlement lookup', async () => {
+    vi.mocked(entitlement.resolveMode).mockRejectedValue(new Error('lookup failed'));
+    vi.mocked(converter.docxToMd).mockResolvedValue('# converted');
+    service.selectedFile.set(new File(['docx'], 'notes.docx', {
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    }));
+
+    await service.convertToMarkdown({ showProfileMenuFn: vi.fn() });
+
+    expect(service.error()).toBeNull();
+    expect(converter.docxToMd).toHaveBeenCalledWith(expect.any(File), 'auto', 'test-key');
+    expect(entitlement.resolveMode).not.toHaveBeenCalled();
+  });
+
+  it('refreshes PDF entitlement on each access check', async () => {
+    vi.mocked(entitlement.resolveMode)
+      .mockResolvedValueOnce('public_byok')
+      .mockResolvedValueOnce('approved_server');
+    vi.mocked(converter.inspectPdf).mockResolvedValue({ pageCount: 1, sizeBytes: 1024 });
+    vi.mocked(converter.pdfToMd).mockResolvedValue('# converted');
+    service.selectedFile.set(new File(['pdf'], 'refresh.pdf', { type: 'application/pdf' }));
+
+    await service.convertToMarkdown({ showProfileMenuFn: vi.fn() });
+
+    service.error.set(null);
+    service.geminiKey.set('');
+
+    await service.convertToMarkdown({ showProfileMenuFn: vi.fn() });
+
+    expect(entitlement.resolveMode).toHaveBeenCalledTimes(2);
+    expect(service.entitlementMode()).toBe('approved_server');
+    expect(service.error()).toBeNull();
+    expect(converter.pdfToMd).toHaveBeenCalledTimes(2);
   });
 });
 

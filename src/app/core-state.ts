@@ -5,7 +5,7 @@ import { auth, signInWithGoogle, logOut, db } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, setDoc, getDoc, collection, addDoc, writeBatch, increment } from 'firebase/firestore';
 import { EntitlementMode, EntitlementService } from './entitlement.service';
-import { buildPublicPdfLimitMessage, exceedsPublicPdfPolicy, PdfInspectionMetadata } from './pdf-access-policy';
+import { buildPublicPdfLimitMessage, exceedsPublicPdfPolicy, PdfInspectionMetadata, PUBLIC_PDF_MAX_BYTES } from './pdf-access-policy';
 
 export type ConversionMode = 'md-to-doc' | 'doc-to-md';
 
@@ -164,27 +164,13 @@ export class CoreStateService {
     this.hasConverted.set(false);
   }
 
-  async canConvert(requireAuthOptions = { showProfileMenuFn: () => {} }): Promise<boolean> {
+  async canConvert(requireAuthOptions: { showProfileMenuFn: () => void; allowMissingGeminiKey?: boolean } = { showProfileMenuFn: () => {} }): Promise<boolean> {
     if (!this.user()) return false;
 
     const email = this.user()?.email;
     if (email === 'schoedelb@gmail.com') return true;
 
-    try {
-      await this.resolveEntitlementMode();
-    } catch (e) {
-      console.error('Error resolving entitlement mode', e);
-      this.error.set('Could not verify conversion access. Please try again.');
-      return false;
-    }
-
-    const selectedFile = this.selectedFile();
-    const allowServerManagedPdf =
-      this.entitlementMode() === 'approved_server' &&
-      !!selectedFile &&
-      this.isPdfFile(selectedFile);
-
-    if (!this.geminiKey() && !allowServerManagedPdf) {
+    if (!this.geminiKey() && !requireAuthOptions.allowMissingGeminiKey) {
       this.error.set("Please provide your Gemini API key in your Profile menu to convert documents.");
       requireAuthOptions.showProfileMenuFn();
       return false;
@@ -193,7 +179,7 @@ export class CoreStateService {
     return this.checkDailyConversionLimit();
   }
 
-  private async resolveEntitlementMode(): Promise<EntitlementMode> {
+  private async resolveEntitlementMode(options: { forceRefresh?: boolean } = {}): Promise<EntitlementMode> {
     const normalizedEmail = this.user()?.email?.trim().toLowerCase() ?? null;
 
     if (!normalizedEmail) {
@@ -202,7 +188,7 @@ export class CoreStateService {
       return 'public_byok';
     }
 
-    if (this.entitlementCacheEmail === normalizedEmail) {
+    if (!options.forceRefresh && this.entitlementCacheEmail === normalizedEmail) {
       return this.entitlementMode();
     }
 
@@ -252,6 +238,11 @@ export class CoreStateService {
   private async enforcePublicPdfPolicy(file: File): Promise<boolean> {
     if (this.entitlementMode() !== 'public_byok' || !this.isPdfFile(file)) {
       return true;
+    }
+
+    if (file.size > PUBLIC_PDF_MAX_BYTES) {
+      this.error.set(buildPublicPdfLimitMessage({ sizeBytes: file.size }));
+      return false;
     }
 
     const metadata = await this.getPdfMetadata(file);
@@ -360,7 +351,20 @@ export class CoreStateService {
     const file = this.selectedFile();
     if (!file) return;
 
-    if (!(await this.canConvert(requireAuthOptions))) return;
+    const isPdf = this.isPdfFile(file);
+    let allowServerManagedPdf = false;
+
+    if (isPdf) {
+      try {
+        allowServerManagedPdf = (await this.resolveEntitlementMode({ forceRefresh: true })) === 'approved_server';
+      } catch (e) {
+        console.error('Error resolving entitlement mode', e);
+        this.error.set('Could not verify conversion access. Please try again.');
+        return;
+      }
+    }
+
+    if (!(await this.canConvert({ ...requireAuthOptions, allowMissingGeminiKey: allowServerManagedPdf }))) return;
     if (!(await this.enforcePublicPdfPolicy(file))) return;
 
     this.processingAction.set('md');
