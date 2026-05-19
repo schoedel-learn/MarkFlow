@@ -53,3 +53,6 @@ __pycache__/
 # System files
 .DS_Store
 Thumbs.db
+
+# Local debug/search output
+search_results.txt
