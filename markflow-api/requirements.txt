@@ -4,3 +4,4 @@ python-multipart==0.0.20
 pymupdf4llm==0.0.17
 google-genai==0.3.0
 pydantic==2.10.4
+firebase-admin==7.1.0
