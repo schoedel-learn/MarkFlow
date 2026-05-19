@@ -1,7 +1,8 @@
 import os
 import tempfile
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException
+from fastapi import FastAPI, File, UploadFile, Form, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from firebase_admin import auth as firebase_auth
 
 from entitlements import is_approved_user
 from pdf_pipeline import improve_pdf_markdown
@@ -21,6 +22,33 @@ app.add_middleware(
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
+
+
+def verify_firebase_id_token(token: str) -> dict:
+    return firebase_auth.verify_id_token(token)
+
+
+def _extract_bearer_token(authorization: str | None) -> str:
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return token
+
+
+def _get_verified_user_email(authorization: str | None) -> str:
+    token = _extract_bearer_token(authorization)
+    try:
+        decoded_token = verify_firebase_id_token(token)
+    except Exception as exc:  # pragma: no cover - exact SDK errors are patched in tests
+        raise HTTPException(status_code=401, detail="Invalid authentication token") from exc
+
+    email = decoded_token.get("email")
+    if not email or not decoded_token.get("email_verified"):
+        raise HTTPException(status_code=403, detail="Verified email required")
+    return email
 
 
 def _ensure_pdf_filename(filename: str | None) -> None:
@@ -91,9 +119,11 @@ async def convert_pdf_approved_sync(
     file: UploadFile = File(...),
     user_email: str = Form(...),
     flavor: str = Form("auto"),
+    authorization: str | None = Header(default=None),
 ):
     _ensure_pdf_filename(file.filename)
-    if not is_approved_user(user_email):
+    verified_email = _get_verified_user_email(authorization)
+    if not is_approved_user(verified_email):
         raise HTTPException(status_code=403, detail="Approved access required")
 
     settings = get_settings()
