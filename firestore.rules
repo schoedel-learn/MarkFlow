@@ -94,5 +94,12 @@ service cloud.firestore {
       allow create, update: if isAuthenticated();
       allow read, delete: if false;
     }
+    match /user_gemini_keys/{uid} {
+      // Per-user backend Gemini API keys are managed exclusively by the
+      // markflow-api Cloud Run service via the Firebase Admin SDK. Direct
+      // client reads/writes are denied so the secret never leaves the
+      // backend boundary.
+      allow read, write: if false;
+    }
   }
 }

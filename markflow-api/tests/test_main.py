@@ -54,7 +54,7 @@ class ApprovedSyncRouteTests(unittest.TestCase):
             patch.object(
                 main,
                 "verify_firebase_id_token",
-                return_value={"email": "member@example.com", "email_verified": True},
+                return_value={"uid": "uid-1", "email": "member@example.com", "email_verified": True},
             ),
             patch.object(main, "is_approved_user", return_value=False) as approved_mock,
         ):
@@ -74,10 +74,11 @@ class ApprovedSyncRouteTests(unittest.TestCase):
             patch.object(
                 main,
                 "verify_firebase_id_token",
-                return_value={"email": "approved@example.com", "email_verified": True},
+                return_value={"uid": "uid-1", "email": "approved@example.com", "email_verified": True},
             ),
             patch.object(main, "is_approved_user", return_value=True) as approved_mock,
             patch.object(main, "improve_pdf_markdown", return_value="# converted") as improve_mock,
+            patch.object(main, "get_user_gemini_key", return_value=None),
             patch.object(
                 main,
                 "get_settings",

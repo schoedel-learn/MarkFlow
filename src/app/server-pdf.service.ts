@@ -12,6 +12,11 @@ interface ErrorResponse {
   detail?: string;
 }
 
+export interface BackendKeyStatus {
+  hasKey: boolean;
+  updatedAt: string | null;
+}
+
 export type ApprovedPdfJobStatus = 'queued' | 'processing' | 'completed' | 'failed';
 
 export interface ApprovedPdfJob {
@@ -136,5 +141,34 @@ export class ServerPdfService {
     }
 
     return latestJob;
+  }
+
+  async getBackendKeyStatus(): Promise<BackendKeyStatus> {
+    const response = await fetch(`${this.apiBaseUrl}/me/gemini-key`, {
+      method: 'GET',
+      headers: await this.getAuthorizedHeaders(),
+    });
+    return this.parseResponse<BackendKeyStatus>(response, 'Failed to load backend API key status.');
+  }
+
+  async setBackendKey(geminiKey: string): Promise<BackendKeyStatus> {
+    const headers = {
+      ...(await this.getAuthorizedHeaders()),
+      'Content-Type': 'application/json',
+    };
+    const response = await fetch(`${this.apiBaseUrl}/me/gemini-key`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ geminiKey }),
+    });
+    return this.parseResponse<BackendKeyStatus>(response, 'Failed to save backend API key.');
+  }
+
+  async clearBackendKey(): Promise<BackendKeyStatus> {
+    const response = await fetch(`${this.apiBaseUrl}/me/gemini-key`, {
+      method: 'DELETE',
+      headers: await this.getAuthorizedHeaders(),
+    });
+    return this.parseResponse<BackendKeyStatus>(response, 'Failed to clear backend API key.');
   }
 }

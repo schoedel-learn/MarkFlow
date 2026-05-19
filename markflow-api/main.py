@@ -2,6 +2,7 @@ import os
 import tempfile
 from fastapi import BackgroundTasks, FastAPI, File, UploadFile, Form, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 from firebase_admin import auth as firebase_auth
 
 from entitlements import is_approved_user
@@ -9,6 +10,7 @@ from job_store import build_storage_paths, create_conversion_job, get_conversion
 from pdf_pipeline import count_pdf_pages, improve_pdf_markdown
 from settings import get_settings
 from storage_service import download_bytes_from_storage, download_text_from_storage, upload_bytes_to_storage, upload_text_to_storage
+from user_keys import delete_user_gemini_key, get_user_gemini_key, get_user_gemini_key_status, set_user_gemini_key
 
 app = FastAPI(title="MarkFlow API", version="1.0.0")
 
@@ -143,7 +145,9 @@ def process_pdf_job(job_id: str, flavor: str) -> None:
         return
 
     settings = get_settings()
-    if not settings.gemini_api_key:
+    user_key = get_user_gemini_key(job.get('userId') or '')
+    effective_key = user_key or settings.gemini_api_key
+    if not effective_key:
         update_conversion_job(job_id, {
             'status': 'failed',
             'errorMessage': 'Server PDF conversion is not configured',
@@ -160,7 +164,7 @@ def process_pdf_job(job_id: str, flavor: str) -> None:
         temp_path = _save_pdf_bytes_to_temp_file(content)
         markdown = improve_pdf_markdown(
             pdf_path=temp_path,
-            api_key=settings.gemini_api_key,
+            api_key=effective_key,
             model=settings.gemini_model,
             chunk_size=settings.pdf_chunk_size,
             flavor_name=_resolve_flavor_name(flavor),
@@ -219,12 +223,15 @@ async def convert_pdf_approved_sync(
     authorization: str | None = Header(default=None),
 ):
     _ensure_pdf_filename(file.filename)
-    verified_email = _get_verified_user_email(authorization)
+    verified_identity = _get_verified_user_identity(authorization)
+    verified_email = verified_identity['email']
     if not is_approved_user(verified_email):
         raise HTTPException(status_code=403, detail="Approved access required")
 
     settings = get_settings()
-    if not settings.gemini_api_key:
+    user_key = get_user_gemini_key(verified_identity['uid'])
+    effective_key = user_key or settings.gemini_api_key
+    if not effective_key:
         raise HTTPException(status_code=503, detail="Server PDF conversion is not configured")
 
     temp_path = ""
@@ -232,7 +239,7 @@ async def convert_pdf_approved_sync(
         temp_path = await _save_upload_to_temp_pdf(file)
         return _convert_pdf_file(
             temp_path,
-            api_key=settings.gemini_api_key,
+            api_key=effective_key,
             model=settings.gemini_model,
             chunk_size=settings.pdf_chunk_size,
             flavor=flavor,
@@ -298,6 +305,46 @@ async def get_pdf_job_markdown(job_id: str, authorization: str | None = Header(d
     if job.get('status') != 'completed' or not job.get('storageOutputPath'):
         raise HTTPException(status_code=409, detail='Job output is not ready')
     return {'markdown': download_text_from_storage(job['storageOutputPath'])}
+
+
+class GeminiKeyPayload(BaseModel):
+    geminiKey: str = Field(..., min_length=1, max_length=256)
+
+
+def _require_approved_identity(authorization: str | None) -> dict[str, str]:
+    identity = _get_verified_user_identity(authorization)
+    if not is_approved_user(identity['email']):
+        raise HTTPException(status_code=403, detail='Approved access required')
+    return identity
+
+
+@app.get('/api/me/gemini-key')
+@app.get('/me/gemini-key')
+async def get_my_gemini_key(authorization: str | None = Header(default=None)):
+    identity = _require_approved_identity(authorization)
+    return get_user_gemini_key_status(identity['uid'])
+
+
+@app.put('/api/me/gemini-key')
+@app.put('/me/gemini-key')
+async def put_my_gemini_key(
+    payload: GeminiKeyPayload,
+    authorization: str | None = Header(default=None),
+):
+    identity = _require_approved_identity(authorization)
+    try:
+        return set_user_gemini_key(identity['uid'], identity['email'], payload.geminiKey)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.delete('/api/me/gemini-key')
+@app.delete('/me/gemini-key')
+async def delete_my_gemini_key(authorization: str | None = Header(default=None)):
+    identity = _require_approved_identity(authorization)
+    delete_user_gemini_key(identity['uid'])
+    return {'hasKey': False, 'updatedAt': None}
+
 
 if __name__ == "__main__":
     import uvicorn

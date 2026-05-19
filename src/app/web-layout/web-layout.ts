@@ -5,6 +5,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { db } from '../firebase';
 import { collection, addDoc } from 'firebase/firestore';
 import { PUBLIC_PDF_CONTACT_EMAIL } from '../pdf-access-policy';
+import { BackendKeyStatus, ServerPdfService } from '../server-pdf.service';
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -16,6 +17,7 @@ import { PUBLIC_PDF_CONTACT_EMAIL } from '../pdf-access-policy';
 })
 export class WebLayoutComponent {
   public state = inject(CoreStateService);
+  private readonly serverPdf = inject(ServerPdfService);
   readonly publicPdfContactEmail = PUBLIC_PDF_CONTACT_EMAIL;
 
   // UI State specific to web layout
@@ -26,6 +28,14 @@ export class WebLayoutComponent {
   bugReportSuccess = signal<boolean>(false);
   contactEmailCopied = signal<boolean>(false);
   private copyResetTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // Backend-stored Gemini key (approved users only)
+  backendKeyStatus = signal<BackendKeyStatus | null>(null);
+  backendKeyInput = signal<string>('');
+  backendKeyLoading = signal<boolean>(false);
+  backendKeySaving = signal<boolean>(false);
+  backendKeyMessage = signal<string | null>(null);
+  backendKeyError = signal<string | null>(null);
 
   async copyContactEmail() {
     const email = this.publicPdfContactEmail;
@@ -53,10 +63,65 @@ export class WebLayoutComponent {
 
   toggleProfileMenu() {
     this.isProfileMenuOpen.update(v => !v);
+    if (this.isProfileMenuOpen() && this.state.entitlementMode() === 'approved_server') {
+      void this.loadBackendKeyStatus();
+    }
   }
 
   closeProfileMenu() {
     this.isProfileMenuOpen.set(false);
+  }
+
+  updateBackendKeyInput(value: string) {
+    this.backendKeyInput.set(value);
+  }
+
+  async loadBackendKeyStatus() {
+    if (this.backendKeyLoading()) return;
+    this.backendKeyLoading.set(true);
+    this.backendKeyError.set(null);
+    try {
+      const status = await this.serverPdf.getBackendKeyStatus();
+      this.backendKeyStatus.set(status);
+    } catch (e) {
+      this.backendKeyError.set(e instanceof Error ? e.message : 'Failed to load backend key status.');
+    } finally {
+      this.backendKeyLoading.set(false);
+    }
+  }
+
+  async saveBackendKey() {
+    const value = this.backendKeyInput().trim();
+    if (!value || this.backendKeySaving()) return;
+    this.backendKeySaving.set(true);
+    this.backendKeyError.set(null);
+    this.backendKeyMessage.set(null);
+    try {
+      const status = await this.serverPdf.setBackendKey(value);
+      this.backendKeyStatus.set(status);
+      this.backendKeyInput.set('');
+      this.backendKeyMessage.set('Saved on server.');
+    } catch (e) {
+      this.backendKeyError.set(e instanceof Error ? e.message : 'Failed to save backend key.');
+    } finally {
+      this.backendKeySaving.set(false);
+    }
+  }
+
+  async clearBackendKey() {
+    if (this.backendKeySaving()) return;
+    this.backendKeySaving.set(true);
+    this.backendKeyError.set(null);
+    this.backendKeyMessage.set(null);
+    try {
+      const status = await this.serverPdf.clearBackendKey();
+      this.backendKeyStatus.set(status);
+      this.backendKeyMessage.set('Removed from server.');
+    } catch (e) {
+      this.backendKeyError.set(e instanceof Error ? e.message : 'Failed to clear backend key.');
+    } finally {
+      this.backendKeySaving.set(false);
+    }
   }
 
   submitGeminiKey() {
