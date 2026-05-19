@@ -166,12 +166,6 @@ export class CoreStateService {
 
   async canConvert(requireAuthOptions = { showProfileMenuFn: () => {} }): Promise<boolean> {
     if (!this.user()) return false;
-    
-    if (!this.geminiKey()) {
-      this.error.set("Please provide your Gemini API key in your Profile menu to convert documents.");
-      requireAuthOptions.showProfileMenuFn();
-      return false;
-    }
 
     const email = this.user()?.email;
     if (email === 'schoedelb@gmail.com') return true;
@@ -181,6 +175,18 @@ export class CoreStateService {
     } catch (e) {
       console.error('Error resolving entitlement mode', e);
       this.error.set('Could not verify conversion access. Please try again.');
+      return false;
+    }
+
+    const selectedFile = this.selectedFile();
+    const allowServerManagedPdf =
+      this.entitlementMode() === 'approved_server' &&
+      !!selectedFile &&
+      this.isPdfFile(selectedFile);
+
+    if (!this.geminiKey() && !allowServerManagedPdf) {
+      this.error.set("Please provide your Gemini API key in your Profile menu to convert documents.");
+      requireAuthOptions.showProfileMenuFn();
       return false;
     }
 

@@ -27,6 +27,6 @@ export class EntitlementService {
     }
 
     const data = snapshot.data() as Record<string, unknown> | undefined;
-    return data?.['enabled'] === false ? 'public_byok' : 'approved_server';
+    return data?.['enabled'] === true ? 'approved_server' : 'public_byok';
   }
 }

@@ -65,6 +65,21 @@ describe('CoreStateService', () => {
     expect(converter.inspectPdf).not.toHaveBeenCalled();
     expect(converter.pdfToMd).toHaveBeenCalledTimes(1);
   });
+
+  it('lets approved users convert PDFs without a Gemini key', async () => {
+    vi.mocked(entitlement.resolveMode).mockResolvedValue('approved_server');
+    vi.mocked(converter.pdfToMd).mockResolvedValue('# converted');
+    service.geminiKey.set('');
+    service.selectedFile.set(new File(['pdf'], 'approved.pdf', { type: 'application/pdf' }));
+    const showProfileMenuFn = vi.fn();
+
+    await service.convertToMarkdown({ showProfileMenuFn });
+
+    expect(service.entitlementMode()).toBe('approved_server');
+    expect(showProfileMenuFn).not.toHaveBeenCalled();
+    expect(service.error()).toBeNull();
+    expect(converter.pdfToMd).toHaveBeenCalledWith(expect.any(File), 'auto', '');
+  });
 });
 
 describe('EntitlementService', () => {
@@ -92,5 +107,18 @@ describe('EntitlementService', () => {
 
     await expect(service.resolveMode('Approved.User@Example.com')).resolves.toBe('approved_server');
     expect(approvedUserLookup).toHaveBeenCalledWith('approved.user@example.com');
+  });
+
+  it.each([
+    { label: 'disabled', data: { enabled: false } },
+    { label: 'missing enabled', data: {} },
+    { label: 'non-boolean enabled', data: { enabled: 'yes' } }
+  ])('does not grant approved_server for $label approved_users documents', async ({ data }) => {
+    approvedUserLookup.mockResolvedValue({
+      exists: () => true,
+      data: () => data
+    } as any);
+
+    await expect(service.resolveMode('approved.user@example.com')).resolves.toBe('public_byok');
   });
 });
