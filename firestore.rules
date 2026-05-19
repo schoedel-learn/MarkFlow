@@ -30,7 +30,22 @@ service cloud.firestore {
         && request.auth.token.email is string
         && request.auth.token.email.size() > 0;
     }
-    function isValidJobCreate() {
+    function hasValidJobCreateTimestamps() {
+      return request.resource.data.createdAt is timestamp
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt is timestamp
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt > request.time
+        && request.resource.data.expiresAt <= request.time + duration.value(30, 'd');
+    }
+    function hasValidJobStorageInputPath(jobId) {
+      return request.resource.data.storageInputPath is string
+        && request.resource.data.storageInputPath.matches(
+          '^pdf-inputs/' + request.auth.uid + '/' + jobId + '/.+$'
+        );
+    }
+    function isValidJobCreate(jobId) {
       return hasOnlyJobCreateFields()
         && request.resource.data.userId == request.auth.uid
         && hasAuthenticatedEmail()
@@ -45,11 +60,8 @@ service cloud.firestore {
         && request.resource.data.pageCount is int
         && request.resource.data.pageCount > 0
         && request.resource.data.inputKind == 'pdf'
-        && request.resource.data.storageInputPath is string
-        && request.resource.data.storageInputPath.size() > 0
-        && request.resource.data.createdAt is timestamp
-        && request.resource.data.updatedAt is timestamp
-        && request.resource.data.expiresAt is timestamp;
+        && hasValidJobStorageInputPath(jobId)
+        && hasValidJobCreateTimestamps();
     }
     function isOwnerJobUpdate() {
       return resource.data.userId == request.auth.uid
@@ -71,7 +83,7 @@ service cloud.firestore {
     }
     match /conversion_jobs/{jobId} {
       allow create: if isAuthenticated()
-        && isValidJobCreate();
+        && isValidJobCreate(jobId);
       allow read: if isAuthenticated()
         && resource.data.userId == request.auth.uid;
       allow update: if isAuthenticated()
