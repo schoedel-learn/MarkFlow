@@ -30,6 +30,11 @@ service cloud.firestore {
         && request.auth.token.email is string
         && request.auth.token.email.size() > 0;
     }
+    function isApprovedUserEmailEnabled() {
+      return hasAuthenticatedEmail()
+        && exists(/databases/$(database)/documents/approved_users/$(request.auth.token.email.lower()))
+        && get(/databases/$(database)/documents/approved_users/$(request.auth.token.email.lower())).data.enabled == true;
+    }
     function hasBoundedJobCreateTimestamps() {
       return request.resource.data.createdAt is timestamp
         && request.resource.data.createdAt == request.time
@@ -69,6 +74,7 @@ service cloud.firestore {
     }
     function isValidApprovedServerBackgroundJobCreate(jobId) {
       return hasValidJobCreateBaseFields()
+        && isApprovedUserEmailEnabled()
         && request.resource.data.source == 'approved_server'
         && request.resource.data.mode == 'background'
         && hasValidJobStorageInputPath(jobId)
@@ -76,6 +82,7 @@ service cloud.firestore {
     }
     function isValidApprovedServerSyncJobCreate() {
       return hasValidJobCreateBaseFields()
+        && isApprovedUserEmailEnabled()
         && request.resource.data.source == 'approved_server'
         && request.resource.data.mode == 'sync'
         && hasNoJobStorageInputPath()
