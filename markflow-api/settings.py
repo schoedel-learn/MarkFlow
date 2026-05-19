@@ -10,6 +10,7 @@ class Settings:
     )
     allowlist_collection: str = os.getenv("ALLOWLIST_COLLECTION", "approved_users")
     storage_bucket: str = os.getenv("FIREBASE_STORAGE_BUCKET", "")
+    firestore_database_id: str = os.getenv("FIRESTORE_DATABASE_ID", "")
     service_base_url: str = os.getenv(
         "SERVICE_BASE_URL", os.getenv("MARKFLOW_SERVICE_BASE_URL", "")
     )

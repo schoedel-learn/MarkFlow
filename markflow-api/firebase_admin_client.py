@@ -21,7 +21,11 @@ def get_firebase_app():
 
 
 def get_firestore_client():
-    return firestore.client(app=get_firebase_app())
+    settings = get_settings()
+    app = get_firebase_app()
+    if settings.firestore_database_id:
+        return firestore.client(app=app, database_id=settings.firestore_database_id)
+    return firestore.client(app=app)
 
 
 def get_storage_bucket():
