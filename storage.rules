@@ -26,8 +26,10 @@ service firebase.storage {
     }
 
     match /pdf-inputs/{userId}/{jobId}/{fileName} {
-      allow read: if isOwner(userId);
+      allow read: if isOwner(userId)
+        && fileName == 'source.pdf';
       allow write: if isOwner(userId)
+        && fileName == 'source.pdf'
         && (resource == null || isSameObjectWrite());
     }
 

@@ -41,9 +41,8 @@ service cloud.firestore {
     }
     function hasValidJobStorageInputPath(jobId) {
       return request.resource.data.storageInputPath is string
-        && request.resource.data.storageInputPath.matches(
-          '^pdf-inputs/' + request.auth.uid + '/' + jobId + '/.+$'
-        );
+        && request.resource.data.storageInputPath
+          == 'pdf-inputs/' + request.auth.uid + '/' + jobId + '/source.pdf';
     }
     function isValidJobCreate(jobId) {
       return hasOnlyJobCreateFields()
