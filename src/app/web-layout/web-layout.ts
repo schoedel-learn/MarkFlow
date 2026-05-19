@@ -24,6 +24,32 @@ export class WebLayoutComponent {
   bugReportText = signal<string>('');
   isSubmittingBugReport = signal<boolean>(false);
   bugReportSuccess = signal<boolean>(false);
+  contactEmailCopied = signal<boolean>(false);
+  private copyResetTimer: ReturnType<typeof setTimeout> | null = null;
+
+  async copyContactEmail() {
+    const email = this.publicPdfContactEmail;
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(email);
+      } else if (typeof document !== 'undefined') {
+        const ta = document.createElement('textarea');
+        ta.value = email;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'absolute';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      this.contactEmailCopied.set(true);
+      if (this.copyResetTimer) clearTimeout(this.copyResetTimer);
+      this.copyResetTimer = setTimeout(() => this.contactEmailCopied.set(false), 2000);
+    } catch {
+      this.contactEmailCopied.set(false);
+    }
+  }
 
   toggleProfileMenu() {
     this.isProfileMenuOpen.update(v => !v);

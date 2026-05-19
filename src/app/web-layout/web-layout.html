@@ -136,7 +136,24 @@
           <p class="mt-1 text-stone-500">Large PDFs bypass the public browser limit and use the managed MarkFlow service automatically. Small approved PDFs stay on the synchronous server path; larger ones are queued as background jobs.</p>
         } @else {
           <p class="font-medium text-stone-800">Public PDF-to-Markdown conversion is limited to a maximum size of 10 MB and 25 pages.</p>
-          <p class="mt-1 text-stone-500">Larger or more complex PDFs may fail without access to more robust backend tools that are part of this app. We use a different tool for front end conversion of smaller files than for backend conversion of larger or more complex files. For larger-document access, contact <a class="text-blue-600 hover:underline" [href]="'mailto:' + publicPdfContactEmail + '?subject=Markflow%20Increased%20Access'">{{ publicPdfContactEmail }}</a> with subject &ldquo;Markflow Increased Access&rdquo;.</p>
+          <p class="mt-1 text-stone-500">Larger or more complex PDFs may fail without access to more robust backend tools that are part of this app. We use a different tool for front end conversion of smaller files than for backend conversion of larger or more complex files. For larger-document access, contact
+            <span class="inline-flex items-center gap-1 align-middle">
+              <span class="font-mono text-stone-700">{{ publicPdfContactEmail }}</span>
+              <button
+                type="button"
+                (click)="copyContactEmail()"
+                [attr.aria-label]="contactEmailCopied() ? 'Email address copied' : 'Copy email address'"
+                [title]="contactEmailCopied() ? 'Copied!' : 'Copy email address'"
+                class="inline-flex items-center justify-center rounded-md p-1 text-stone-500 hover:text-stone-800 hover:bg-stone-100 transition-colors"
+              >
+                <mat-icon class="text-base" style="font-size:16px;width:16px;height:16px;line-height:16px;">{{ contactEmailCopied() ? 'check' : 'content_copy' }}</mat-icon>
+              </button>
+              @if (contactEmailCopied()) {
+                <span class="text-xs text-green-700" aria-live="polite">Copied!</span>
+              }
+            </span>
+            with subject &ldquo;Markflow Increased Access&rdquo;.
+          </p>
         }
       </div>
     }
