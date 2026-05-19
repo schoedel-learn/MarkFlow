@@ -5,8 +5,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from firebase_admin import auth as firebase_auth
 
 from entitlements import is_approved_user
-from pdf_pipeline import improve_pdf_markdown
+from job_store import create_conversion_job, get_conversion_job
+from pdf_pipeline import count_pdf_pages, improve_pdf_markdown
 from settings import get_settings
+from storage_service import upload_bytes_to_storage
 
 app = FastAPI(title="MarkFlow API", version="1.0.0")
 
@@ -51,6 +53,41 @@ def _get_verified_user_email(authorization: str | None) -> str:
     return email
 
 
+def _get_verified_user_identity(authorization: str | None) -> dict[str, str]:
+    token = _extract_bearer_token(authorization)
+    try:
+        decoded_token = verify_firebase_id_token(token)
+    except Exception as exc:  # pragma: no cover - exact SDK errors are patched in tests
+        raise HTTPException(status_code=401, detail="Invalid authentication token") from exc
+
+    email = decoded_token.get("email")
+    uid = decoded_token.get("uid")
+    if not email or not decoded_token.get("email_verified"):
+        raise HTTPException(status_code=403, detail="Verified email required")
+    if not uid:
+        raise HTTPException(status_code=401, detail="Invalid authentication token")
+    return {"uid": uid, "email": email}
+
+
+async def _read_upload_bytes(file: UploadFile) -> bytes:
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Uploaded PDF is empty")
+    return content
+
+
+def _count_pdf_pages_from_bytes(content: bytes) -> int:
+    temp_path = ""
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
+            temp_file.write(content)
+            temp_path = temp_file.name
+        return count_pdf_pages(temp_path)
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            os.remove(temp_path)
+
+
 def _ensure_pdf_filename(filename: str | None) -> None:
     if not filename or not filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="File must be a PDF")
@@ -83,6 +120,15 @@ def _convert_pdf_file(
         flavor_name=_resolve_flavor_name(flavor),
     )
     return {"markdown": final_md}
+
+
+def _ensure_owner_job(job_id: str, user_id: str) -> dict:
+    job = get_conversion_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail='Job not found')
+    if job.get('userId') != user_id:
+        raise HTTPException(status_code=404, detail='Job not found')
+    return job
 
 @app.post("/api/convert/pdf")
 @app.post("/convert/pdf")
@@ -148,6 +194,45 @@ async def convert_pdf_approved_sync(
     finally:
         if temp_path and os.path.exists(temp_path):
             os.remove(temp_path)
+
+
+@app.post('/api/jobs/pdf')
+@app.post('/jobs/pdf')
+async def create_pdf_job(
+    file: UploadFile = File(...),
+    authorization: str | None = Header(default=None),
+):
+    _ensure_pdf_filename(file.filename)
+    identity = _get_verified_user_identity(authorization)
+    if not is_approved_user(identity['email']):
+        raise HTTPException(status_code=403, detail='Approved access required')
+
+    content = await _read_upload_bytes(file)
+    page_count = _count_pdf_pages_from_bytes(content)
+    job = create_conversion_job(
+        user_id=identity['uid'],
+        user_email=identity['email'],
+        filename=file.filename or 'source.pdf',
+        size_bytes=len(content),
+        page_count=page_count,
+    )
+    upload_bytes_to_storage(
+        job['storageInputPath'],
+        content,
+        content_type=file.content_type or 'application/pdf',
+    )
+    return {
+        'jobId': job['jobId'],
+        'status': job['status'],
+        'storageInputPath': job['storageInputPath'],
+    }
+
+
+@app.get('/api/jobs/pdf/{job_id}')
+@app.get('/jobs/pdf/{job_id}')
+async def get_pdf_job(job_id: str, authorization: str | None = Header(default=None)):
+    identity = _get_verified_user_identity(authorization)
+    return _ensure_owner_job(job_id, identity['uid'])
 
 if __name__ == "__main__":
     import uvicorn
