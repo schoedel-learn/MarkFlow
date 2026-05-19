@@ -135,8 +135,8 @@
           <p class="font-medium text-stone-800">Your account is approved for server-managed PDF conversion.</p>
           <p class="mt-1 text-stone-500">Large PDFs bypass the public browser limit and use the managed MarkFlow service automatically. Small approved PDFs stay on the synchronous server path; larger ones are queued as background jobs.</p>
         } @else {
-          <p class="font-medium text-stone-800">Public PDF-to-Markdown conversion is limited to 10 MB and 25 pages.</p>
-          <p class="mt-1 text-stone-500">Larger or more complex PDFs may still fail in-browser. For larger-document access, contact <a class="text-blue-600 hover:underline" [href]="'mailto:' + publicPdfContactEmail">{{ publicPdfContactEmail }}</a>.</p>
+          <p class="font-medium text-stone-800">Public PDF-to-Markdown conversion is limited to a maximum size of 10 MB and 25 pages.</p>
+          <p class="mt-1 text-stone-500">Larger or more complex PDFs may fail without access to more robust backend tools that are part of this app. We use a different tool for front end conversion of smaller files than for backend conversion of larger or more complex files. For larger-document access, contact <a class="text-blue-600 hover:underline" [href]="'mailto:' + publicPdfContactEmail + '?subject=Markflow%20Increased%20Access'">{{ publicPdfContactEmail }}</a> with subject &ldquo;Markflow Increased Access&rdquo;.</p>
         }
       </div>
     }

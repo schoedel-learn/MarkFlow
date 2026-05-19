@@ -32,5 +32,5 @@ export function buildPublicPdfLimitMessage(metadata?: Partial<PdfInspectionMetad
     ? ` This file cannot be converted publicly because ${reasons.join(' and ')}.`
     : '';
 
-  return `Public PDF-to-Markdown conversion is limited to 10 MB and 25 pages. Contact ${PUBLIC_PDF_CONTACT_EMAIL} for larger PDFs.${detail}`;
+  return `Public PDF-to-Markdown conversion is limited to a maximum size of 10 MB and 25 pages. Larger or more complex PDFs may fail without access to more robust backend tools that are part of this app. For larger-document access, contact ${PUBLIC_PDF_CONTACT_EMAIL} with subject "Markflow Increased Access".${detail}`;
 }
