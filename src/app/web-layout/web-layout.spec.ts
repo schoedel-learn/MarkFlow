@@ -1,18 +1,18 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { WebLayout } from './web-layout';
+import { WebLayoutComponent } from './web-layout';
 
-describe('WebLayout', () => {
-  let component: WebLayout;
-  let fixture: ComponentFixture<WebLayout>;
+describe('WebLayoutComponent', () => {
+  let component: WebLayoutComponent;
+  let fixture: ComponentFixture<WebLayoutComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [WebLayout]
+      imports: [WebLayoutComponent]
     })
     .compileComponents();
 
-    fixture = TestBed.createComponent(WebLayout);
+    fixture = TestBed.createComponent(WebLayoutComponent);
     component = fixture.componentInstance;
     await fixture.whenStable();
   });

@@ -4,6 +4,8 @@ import { ConverterService, MarkdownFlavor } from './converter.service';
 import { auth, signInWithGoogle, logOut, db } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, setDoc, getDoc, collection, addDoc, writeBatch, increment } from 'firebase/firestore';
+import { EntitlementMode, EntitlementService } from './entitlement.service';
+import { buildPublicPdfLimitMessage, exceedsPublicPdfPolicy, PdfInspectionMetadata } from './pdf-access-policy';
 
 export type ConversionMode = 'md-to-doc' | 'doc-to-md';
 
@@ -12,12 +14,15 @@ export type ConversionMode = 'md-to-doc' | 'doc-to-md';
 })
 export class CoreStateService {
   private converter = inject(ConverterService);
+  private entitlementService = inject(EntitlementService);
   private platformId = inject(PLATFORM_ID);
+  private entitlementCacheEmail: string | null = null;
   
   mode = signal<ConversionMode>('md-to-doc');
   markdownFlavor = signal<MarkdownFlavor>('auto');
   processingAction = signal<'pdf' | 'docx' | 'md' | 'txt' | null>(null);
   error = signal<string | null>(null);
+  entitlementMode = signal<EntitlementMode>('public_byok');
   
   // Auth & AI Key
   user = signal<User | null>(null);
@@ -41,6 +46,8 @@ export class CoreStateService {
     onAuthStateChanged(auth, async (user) => {
       this.user.set(user);
       this.isAuthReady.set(true);
+      this.entitlementCacheEmail = null;
+      this.entitlementMode.set('public_byok');
       if (user) {
         if (!sessionStorage.getItem('login_recorded')) {
           sessionStorage.setItem('login_recorded', 'true');
@@ -56,6 +63,12 @@ export class CoreStateService {
           }, { merge: true });
         } catch (e) {
           console.error("Error saving user profile", e);
+        }
+
+        try {
+          await this.resolveEntitlementMode();
+        } catch (e) {
+          console.error('Error preloading entitlement mode', e);
         }
       }
     });
@@ -164,6 +177,38 @@ export class CoreStateService {
     if (email === 'schoedelb@gmail.com') return true;
 
     try {
+      await this.resolveEntitlementMode();
+    } catch (e) {
+      console.error('Error resolving entitlement mode', e);
+      this.error.set('Could not verify conversion access. Please try again.');
+      return false;
+    }
+
+    return this.checkDailyConversionLimit();
+  }
+
+  private async resolveEntitlementMode(): Promise<EntitlementMode> {
+    const normalizedEmail = this.user()?.email?.trim().toLowerCase() ?? null;
+
+    if (!normalizedEmail) {
+      this.entitlementCacheEmail = null;
+      this.entitlementMode.set('public_byok');
+      return 'public_byok';
+    }
+
+    if (this.entitlementCacheEmail === normalizedEmail) {
+      return this.entitlementMode();
+    }
+
+    const mode = await this.entitlementService.resolveMode(normalizedEmail);
+    this.entitlementCacheEmail = normalizedEmail;
+    this.entitlementMode.set(mode);
+    return mode;
+  }
+
+  private async checkDailyConversionLimit(): Promise<boolean> {
+
+    try {
       const userRef = doc(db, 'users', this.user()!.uid);
       const userSnap = await getDoc(userRef);
       
@@ -187,6 +232,29 @@ export class CoreStateService {
       this.error.set("Could not verify conversion limits. Please try again.");
       return false;
     }
+  }
+
+  private isPdfFile(file: File): boolean {
+    const fileName = file.name.toLowerCase();
+    return file.type === 'application/pdf' || fileName.endsWith('.pdf');
+  }
+
+  private async getPdfMetadata(file: File): Promise<PdfInspectionMetadata> {
+    return this.converter.inspectPdf(file);
+  }
+
+  private async enforcePublicPdfPolicy(file: File): Promise<boolean> {
+    if (this.entitlementMode() !== 'public_byok' || !this.isPdfFile(file)) {
+      return true;
+    }
+
+    const metadata = await this.getPdfMetadata(file);
+    if (!exceedsPublicPdfPolicy(metadata)) {
+      return true;
+    }
+
+    this.error.set(buildPublicPdfLimitMessage(metadata));
+    return false;
   }
 
   async incrementConversionCount() {
@@ -283,10 +351,11 @@ export class CoreStateService {
   }
 
   async convertToMarkdown(requireAuthOptions: any) {
-    if (!(await this.canConvert(requireAuthOptions))) return;
-
     const file = this.selectedFile();
     if (!file) return;
+
+    if (!(await this.canConvert(requireAuthOptions))) return;
+    if (!(await this.enforcePublicPdfPolicy(file))) return;
 
     this.processingAction.set('md');
     this.conversionType.set('Markdown');

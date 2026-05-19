@@ -7,6 +7,7 @@ import * as mammoth from 'mammoth';
 import TurndownService from 'turndown';
 import * as pdfjsLib from 'pdfjs-dist';
 import { GoogleGenAI } from '@google/genai';
+import { PdfInspectionMetadata } from './pdf-access-policy';
 
 export type MarkdownFlavor = 
   | 'auto' 
@@ -144,6 +145,28 @@ ${text}`,
 
   private getTurndownService(flavor: MarkdownFlavor): TurndownService {
     return flavor === 'commonmark' ? this.turndownService : this.gfmTurndownService;
+  }
+
+  async inspectPdf(file: File): Promise<PdfInspectionMetadata> {
+    console.info(`[inspectPdf] Inspecting PDF metadata for file: ${file.name}`);
+
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
+      const pdf = await loadingTask.promise;
+
+      try {
+        return {
+          pageCount: pdf.numPages,
+          sizeBytes: file.size,
+        };
+      } finally {
+        await pdf.destroy();
+      }
+    } catch (error) {
+      console.error('[inspectPdf] Failed to inspect PDF metadata:', error);
+      throw new Error(`Failed to inspect PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   async mdToPdf(md: string, filename: string, flavor: MarkdownFlavor = 'gfm'): Promise<void> {

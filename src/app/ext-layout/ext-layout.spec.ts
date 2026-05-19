@@ -1,18 +1,18 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { ExtLayout } from './ext-layout';
+import { ExtLayoutComponent } from './ext-layout';
 
-describe('ExtLayout', () => {
-  let component: ExtLayout;
-  let fixture: ComponentFixture<ExtLayout>;
+describe('ExtLayoutComponent', () => {
+  let component: ExtLayoutComponent;
+  let fixture: ComponentFixture<ExtLayoutComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ExtLayout]
+      imports: [ExtLayoutComponent]
     })
     .compileComponents();
 
-    fixture = TestBed.createComponent(ExtLayout);
+    fixture = TestBed.createComponent(ExtLayoutComponent);
     component = fixture.componentInstance;
     await fixture.whenStable();
   });
