@@ -6,6 +6,7 @@ import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, setDoc, getDoc, collection, addDoc, writeBatch, increment } from 'firebase/firestore';
 import { EntitlementMode, EntitlementService } from './entitlement.service';
 import { buildPublicPdfLimitMessage, exceedsPublicPdfPolicy, PdfInspectionMetadata, PUBLIC_PDF_MAX_BYTES } from './pdf-access-policy';
+import { ServerPdfService } from './server-pdf.service';
 
 export type ConversionMode = 'md-to-doc' | 'doc-to-md';
 
@@ -15,6 +16,7 @@ export type ConversionMode = 'md-to-doc' | 'doc-to-md';
 export class CoreStateService {
   private converter = inject(ConverterService);
   private entitlementService = inject(EntitlementService);
+  private serverPdfService = inject(ServerPdfService);
   private platformId = inject(PLATFORM_ID);
   private entitlementCacheEmail: string | null = null;
   
@@ -373,7 +375,11 @@ export class CoreStateService {
       if (file.name.endsWith('.docx')) {
         md = await this.converter.docxToMd(file, this.markdownFlavor(), this.geminiKey());
       } else if (file.name.endsWith('.pdf')) {
-        md = await this.converter.pdfToMd(file, this.markdownFlavor(), this.geminiKey());
+        if (allowServerManagedPdf) {
+          md = await this.serverPdfService.convertApprovedPdfSync(file, this.markdownFlavor());
+        } else {
+          md = await this.converter.pdfToMd(file, this.markdownFlavor(), this.geminiKey());
+        }
       } else if (file.name.endsWith('.html')) {
         md = await this.converter.htmlToMd(await file.text(), this.markdownFlavor(), this.geminiKey());
       } else if (file.name.endsWith('.txt')) {

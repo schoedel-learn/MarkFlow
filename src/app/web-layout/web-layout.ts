@@ -4,6 +4,7 @@ import { CoreStateService } from '../core-state';
 import { MatIconModule } from '@angular/material/icon';
 import { db } from '../firebase';
 import { collection, addDoc } from 'firebase/firestore';
+import { PUBLIC_PDF_CONTACT_EMAIL } from '../pdf-access-policy';
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -15,6 +16,7 @@ import { collection, addDoc } from 'firebase/firestore';
 })
 export class WebLayoutComponent {
   public state = inject(CoreStateService);
+  readonly publicPdfContactEmail = PUBLIC_PDF_CONTACT_EMAIL;
 
   // UI State specific to web layout
   isProfileMenuOpen = signal<boolean>(false);
@@ -158,5 +160,13 @@ export class WebLayoutComponent {
 
   get requireAuthOptions() {
     return { showProfileMenuFn: () => this.isProfileMenuOpen.set(true) };
+  }
+
+  get showPdfAccessNotice() {
+    return this.state.mode() === 'doc-to-md' && !!this.state.user();
+  }
+
+  get isApprovedUser() {
+    return this.state.entitlementMode() === 'approved_server';
   }
 }

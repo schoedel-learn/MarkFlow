@@ -129,6 +129,18 @@
       </button>
     </div>
 
+    @if (showPdfAccessNotice) {
+      <div class="mb-8 rounded-2xl border border-stone-200 bg-white/80 px-5 py-4 text-sm text-stone-600 shadow-sm">
+        @if (isApprovedUser) {
+          <p class="font-medium text-stone-800">Your account is approved for server-managed PDF conversion.</p>
+          <p class="mt-1 text-stone-500">Large PDFs bypass the public browser limit and use the managed MarkFlow service automatically.</p>
+        } @else {
+          <p class="font-medium text-stone-800">Public PDF-to-Markdown conversion is limited to 10 MB and 25 pages.</p>
+          <p class="mt-1 text-stone-500">Larger or more complex PDFs may still fail in-browser. For larger-document access, contact <a class="text-blue-600 hover:underline" [href]="'mailto:' + publicPdfContactEmail">{{ publicPdfContactEmail }}</a>.</p>
+        }
+      </div>
+    }
+
     <!-- Main Card -->
     <div class="glass-card w-full max-w-2xl p-8 md:p-12 transition-all duration-500 animate-in slide-in-from-bottom-4">
     

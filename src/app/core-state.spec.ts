@@ -6,11 +6,13 @@ import { ConverterService } from './converter.service';
 import { CoreStateService } from './core-state';
 import { APPROVED_USER_LOOKUP, EntitlementService } from './entitlement.service';
 import { buildPublicPdfLimitMessage, PUBLIC_PDF_MAX_BYTES, PUBLIC_PDF_MAX_PAGES } from './pdf-access-policy';
+import { ServerPdfService } from './server-pdf.service';
 
 describe('CoreStateService', () => {
   let service: CoreStateService;
   let converter: Pick<ConverterService, 'inspectPdf' | 'pdfToMd' | 'docxToMd'>;
   let entitlement: Pick<EntitlementService, 'resolveMode'>;
+  let serverPdf: Pick<ServerPdfService, 'convertApprovedPdfSync'>;
 
   beforeEach(() => {
     converter = {
@@ -21,13 +23,17 @@ describe('CoreStateService', () => {
     entitlement = {
       resolveMode: vi.fn()
     };
+    serverPdf = {
+      convertApprovedPdfSync: vi.fn()
+    };
 
     TestBed.configureTestingModule({
       providers: [
         CoreStateService,
         { provide: PLATFORM_ID, useValue: 'browser' },
         { provide: ConverterService, useValue: converter },
-        { provide: EntitlementService, useValue: entitlement }
+        { provide: EntitlementService, useValue: entitlement },
+        { provide: ServerPdfService, useValue: serverPdf }
       ]
     });
 
@@ -70,20 +76,20 @@ describe('CoreStateService', () => {
 
   it('lets approved users bypass the public PDF block', async () => {
     vi.mocked(entitlement.resolveMode).mockResolvedValue('approved_server');
-    vi.mocked(converter.inspectPdf).mockResolvedValue({ pageCount: PUBLIC_PDF_MAX_PAGES + 100, sizeBytes: 25 * 1024 * 1024 });
-    vi.mocked(converter.pdfToMd).mockResolvedValue('# converted');
+    vi.mocked(serverPdf.convertApprovedPdfSync).mockResolvedValue('# converted');
     service.selectedFile.set(new File(['pdf'], 'large.pdf', { type: 'application/pdf' }));
 
     await service.convertToMarkdown({ showProfileMenuFn: vi.fn() });
 
     expect(service.entitlementMode()).toBe('approved_server');
     expect(converter.inspectPdf).not.toHaveBeenCalled();
-    expect(converter.pdfToMd).toHaveBeenCalledTimes(1);
+    expect(converter.pdfToMd).not.toHaveBeenCalled();
+    expect(serverPdf.convertApprovedPdfSync).toHaveBeenCalledTimes(1);
   });
 
   it('lets approved users convert PDFs without a Gemini key', async () => {
     vi.mocked(entitlement.resolveMode).mockResolvedValue('approved_server');
-    vi.mocked(converter.pdfToMd).mockResolvedValue('# converted');
+    vi.mocked(serverPdf.convertApprovedPdfSync).mockResolvedValue('# converted');
     service.geminiKey.set('');
     service.selectedFile.set(new File(['pdf'], 'approved.pdf', { type: 'application/pdf' }));
     const showProfileMenuFn = vi.fn();
@@ -93,7 +99,8 @@ describe('CoreStateService', () => {
     expect(service.entitlementMode()).toBe('approved_server');
     expect(showProfileMenuFn).not.toHaveBeenCalled();
     expect(service.error()).toBeNull();
-    expect(converter.pdfToMd).toHaveBeenCalledWith(expect.any(File), 'auto', '');
+    expect(converter.pdfToMd).not.toHaveBeenCalled();
+    expect(serverPdf.convertApprovedPdfSync).toHaveBeenCalledWith(expect.any(File), 'auto');
   });
 
   it('does not block non-PDF markdown conversions on entitlement lookup', async () => {
@@ -116,6 +123,7 @@ describe('CoreStateService', () => {
       .mockResolvedValueOnce('approved_server');
     vi.mocked(converter.inspectPdf).mockResolvedValue({ pageCount: 1, sizeBytes: 1024 });
     vi.mocked(converter.pdfToMd).mockResolvedValue('# converted');
+    vi.mocked(serverPdf.convertApprovedPdfSync).mockResolvedValue('# converted');
     service.selectedFile.set(new File(['pdf'], 'refresh.pdf', { type: 'application/pdf' }));
 
     await service.convertToMarkdown({ showProfileMenuFn: vi.fn() });
@@ -128,7 +136,8 @@ describe('CoreStateService', () => {
     expect(entitlement.resolveMode).toHaveBeenCalledTimes(2);
     expect(service.entitlementMode()).toBe('approved_server');
     expect(service.error()).toBeNull();
-    expect(converter.pdfToMd).toHaveBeenCalledTimes(2);
+    expect(converter.pdfToMd).toHaveBeenCalledTimes(1);
+    expect(serverPdf.convertApprovedPdfSync).toHaveBeenCalledTimes(1);
   });
 
   it('falls back to public_byok when PDF entitlement refresh fails', async () => {
