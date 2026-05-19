@@ -158,11 +158,12 @@ Retention policy:
 
 1. User signs in.
 2. Frontend confirms approved entitlement.
-3. Frontend uploads the file to Storage and creates a Firestore job record.
-4. Python service processes the job asynchronously.
-5. Python service updates Firestore status as the job progresses.
-6. Python service writes output Markdown to Storage.
-7. Frontend subscribes to the job record and enables download when complete.
+3. Frontend sends the file or upload request to the Python service.
+4. Python service verifies the request, stores the source PDF when needed, and creates the Firestore job record.
+5. Python service processes the job asynchronously.
+6. Python service updates Firestore status as the job progresses.
+7. Python service writes output Markdown to Storage.
+8. Frontend subscribes to the job record and enables download when complete.
 
 ## Service Boundaries
 
@@ -173,6 +174,7 @@ The Python backend becomes the only place that should own:
 - server-managed Gemini credentials,
 - server-side PDF extraction,
 - approved-user large-file processing,
+- approved-user background job creation,
 - Storage-backed artifact generation,
 - background job execution.
 

@@ -19,7 +19,6 @@ service cloud.firestore {
         'sizeBytes',
         'pageCount',
         'inputKind',
-        'storageInputPath',
         'createdAt',
         'updatedAt',
         'expiresAt'
@@ -30,11 +29,6 @@ service cloud.firestore {
         && request.auth.token.email is string
         && request.auth.token.email.size() > 0;
     }
-    function isApprovedUserEmailEnabled() {
-      return hasAuthenticatedEmail()
-        && exists(/databases/$(database)/documents/approved_users/$(request.auth.token.email.lower()))
-        && get(/databases/$(database)/documents/approved_users/$(request.auth.token.email.lower())).data.enabled == true;
-    }
     function hasBoundedJobCreateTimestamps() {
       return request.resource.data.createdAt is timestamp
         && request.resource.data.createdAt == request.time
@@ -44,26 +38,14 @@ service cloud.firestore {
         && request.resource.data.expiresAt > request.time
         && request.resource.data.expiresAt <= request.time + duration.value(30, 'd');
     }
-    function hasValidJobStorageInputPath(jobId) {
-      return request.resource.data.storageInputPath is string
-        && request.resource.data.storageInputPath
-          == 'pdf-inputs/' + request.auth.uid + '/' + jobId + '/source.pdf';
-    }
-    function hasNoJobStorageInputPath() {
-      return !request.resource.data.keys().hasAny(['storageInputPath']);
-    }
-    function hasBackgroundJobCreateTimestamps() {
-      return hasBoundedJobCreateTimestamps()
-        && request.resource.data.expiresAt == request.time + duration.value(30, 'd');
-    }
     function hasValidJobCreateBaseFields() {
       return hasOnlyJobCreateFields()
         && request.resource.data.userId == request.auth.uid
         && hasAuthenticatedEmail()
         && request.resource.data.userEmail == request.auth.token.email
         && request.resource.data.status == 'queued'
-        && request.resource.data.source in ['approved_server', 'public_byok']
-        && request.resource.data.mode in ['sync', 'background']
+        && request.resource.data.source == 'public_byok'
+        && request.resource.data.mode == 'sync'
         && request.resource.data.originalFilename is string
         && request.resource.data.originalFilename.size() > 0
         && request.resource.data.sizeBytes is int
@@ -72,38 +54,12 @@ service cloud.firestore {
         && request.resource.data.pageCount > 0
         && request.resource.data.inputKind == 'pdf';
     }
-    function isValidApprovedServerBackgroundJobCreate(jobId) {
-      return hasValidJobCreateBaseFields()
-        && isApprovedUserEmailEnabled()
-        && request.resource.data.source == 'approved_server'
-        && request.resource.data.mode == 'background'
-        && hasValidJobStorageInputPath(jobId)
-        && hasBackgroundJobCreateTimestamps();
-    }
-    function isValidApprovedServerSyncJobCreate() {
-      return hasValidJobCreateBaseFields()
-        && isApprovedUserEmailEnabled()
-        && request.resource.data.source == 'approved_server'
-        && request.resource.data.mode == 'sync'
-        && hasNoJobStorageInputPath()
-        && hasBoundedJobCreateTimestamps();
-    }
     function isValidPublicByokSyncJobCreate() {
       return hasValidJobCreateBaseFields()
-        && request.resource.data.source == 'public_byok'
-        && request.resource.data.mode == 'sync'
-        && hasNoJobStorageInputPath()
         && hasBoundedJobCreateTimestamps();
     }
-    function isValidJobCreate(jobId) {
-      return isValidApprovedServerBackgroundJobCreate(jobId)
-        || isValidApprovedServerSyncJobCreate()
-        || isValidPublicByokSyncJobCreate();
-    }
-    function isOwnerJobUpdate() {
-      return resource.data.userId == request.auth.uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['updatedAt'])
-        && request.resource.data.updatedAt == request.time;
+    function isValidJobCreate() {
+      return isValidPublicByokSyncJobCreate();
     }
 
     match /users/{userId} {
@@ -120,11 +76,10 @@ service cloud.firestore {
     }
     match /conversion_jobs/{jobId} {
       allow create: if isAuthenticated()
-        && isValidJobCreate(jobId);
+        && isValidJobCreate();
       allow read: if isAuthenticated()
         && resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated()
-        && isOwnerJobUpdate();
+      allow update: if false;
       allow delete: if false;
     }
     match /conversion_errors/{errorId} {
