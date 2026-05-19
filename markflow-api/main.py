@@ -1,14 +1,14 @@
 import os
 import tempfile
-from fastapi import FastAPI, File, UploadFile, Form, Header, HTTPException
+from fastapi import BackgroundTasks, FastAPI, File, UploadFile, Form, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from firebase_admin import auth as firebase_auth
 
 from entitlements import is_approved_user
-from job_store import create_conversion_job, get_conversion_job
+from job_store import build_storage_paths, create_conversion_job, get_conversion_job, update_conversion_job
 from pdf_pipeline import count_pdf_pages, improve_pdf_markdown
 from settings import get_settings
-from storage_service import upload_bytes_to_storage
+from storage_service import download_bytes_from_storage, download_text_from_storage, upload_bytes_to_storage, upload_text_to_storage
 
 app = FastAPI(title="MarkFlow API", version="1.0.0")
 
@@ -130,6 +130,57 @@ def _ensure_owner_job(job_id: str, user_id: str) -> dict:
         raise HTTPException(status_code=404, detail='Job not found')
     return job
 
+
+def _save_pdf_bytes_to_temp_file(content: bytes) -> str:
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
+        temp_file.write(content)
+        return temp_file.name
+
+
+def process_pdf_job(job_id: str, flavor: str) -> None:
+    job = get_conversion_job(job_id)
+    if not job:
+        return
+
+    settings = get_settings()
+    if not settings.gemini_api_key:
+        update_conversion_job(job_id, {
+            'status': 'failed',
+            'errorMessage': 'Server PDF conversion is not configured',
+            'flavor': flavor,
+        })
+        return
+
+    temp_path = ''
+    try:
+        update_conversion_job(job_id, {'status': 'processing'})
+        input_path = job['storageInputPath']
+        output_path = build_storage_paths(job['userId'], job_id)[1]
+        content = download_bytes_from_storage(input_path)
+        temp_path = _save_pdf_bytes_to_temp_file(content)
+        markdown = improve_pdf_markdown(
+            pdf_path=temp_path,
+            api_key=settings.gemini_api_key,
+            model=settings.gemini_model,
+            chunk_size=settings.pdf_chunk_size,
+            flavor_name=_resolve_flavor_name(flavor),
+        )
+        upload_text_to_storage(output_path, markdown)
+        update_conversion_job(job_id, {
+            'status': 'completed',
+            'storageOutputPath': output_path,
+            'flavor': flavor,
+        })
+    except Exception as exc:
+        update_conversion_job(job_id, {
+            'status': 'failed',
+            'errorMessage': str(exc),
+            'flavor': flavor,
+        })
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            os.remove(temp_path)
+
 @app.post("/api/convert/pdf")
 @app.post("/convert/pdf")
 async def convert_pdf(
@@ -199,7 +250,9 @@ async def convert_pdf_approved_sync(
 @app.post('/api/jobs/pdf')
 @app.post('/jobs/pdf')
 async def create_pdf_job(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
+    flavor: str = Form('auto'),
     authorization: str | None = Header(default=None),
 ):
     _ensure_pdf_filename(file.filename)
@@ -213,6 +266,7 @@ async def create_pdf_job(
         user_id=identity['uid'],
         user_email=identity['email'],
         filename=file.filename or 'source.pdf',
+        flavor=flavor,
         size_bytes=len(content),
         page_count=page_count,
     )
@@ -221,6 +275,7 @@ async def create_pdf_job(
         content,
         content_type=file.content_type or 'application/pdf',
     )
+    background_tasks.add_task(process_pdf_job, job['jobId'], flavor)
     return {
         'jobId': job['jobId'],
         'status': job['status'],
@@ -233,6 +288,16 @@ async def create_pdf_job(
 async def get_pdf_job(job_id: str, authorization: str | None = Header(default=None)):
     identity = _get_verified_user_identity(authorization)
     return _ensure_owner_job(job_id, identity['uid'])
+
+
+@app.get('/api/jobs/pdf/{job_id}/markdown')
+@app.get('/jobs/pdf/{job_id}/markdown')
+async def get_pdf_job_markdown(job_id: str, authorization: str | None = Header(default=None)):
+    identity = _get_verified_user_identity(authorization)
+    job = _ensure_owner_job(job_id, identity['uid'])
+    if job.get('status') != 'completed' or not job.get('storageOutputPath'):
+        raise HTTPException(status_code=409, detail='Job output is not ready')
+    return {'markdown': download_text_from_storage(job['storageOutputPath'])}
 
 if __name__ == "__main__":
     import uvicorn

@@ -285,6 +285,9 @@ export class CoreStateService {
         this.approvedPdfJob.set(job);
 
         if (job.status === 'completed') {
+          const markdown = await this.serverPdfService.getApprovedPdfMarkdown(jobId);
+          const originalFilename = job.originalFilename ?? this.selectedFile()?.name ?? 'document.pdf';
+          this.downloadFile(markdown, originalFilename.replace(/\.pdf$/i, '.md'), 'text/markdown');
           await this.incrementConversionCount();
           return;
         }
@@ -422,7 +425,7 @@ export class CoreStateService {
       } else if (file.name.endsWith('.pdf')) {
         if (allowServerManagedPdf) {
           if (await this.shouldUseApprovedBackgroundJob(file)) {
-            const job = await this.serverPdfService.createApprovedPdfJob(file);
+            const job = await this.serverPdfService.createApprovedPdfJob(file, this.markdownFlavor());
             this.approvedPdfJob.set(job);
             this.startApprovedPdfJobPolling(job.jobId);
             return;

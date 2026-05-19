@@ -79,6 +79,7 @@ class BackgroundJobRouteTests(unittest.TestCase):
             patch.object(main, 'is_approved_user', return_value=True),
             patch.object(main, 'count_pdf_pages', return_value=9),
             patch.object(main, 'upload_bytes_to_storage') as upload_mock,
+            patch.object(main, 'process_pdf_job') as process_mock,
             patch.object(main, 'create_conversion_job', return_value={'jobId': 'job123', 'status': 'queued', 'storageInputPath': 'pdf-inputs/u1/job123/source.pdf'}) as create_mock,
         ):
             response = self.client.post(
@@ -91,6 +92,7 @@ class BackgroundJobRouteTests(unittest.TestCase):
         self.assertEqual(response.json(), {'jobId': 'job123', 'status': 'queued', 'storageInputPath': 'pdf-inputs/u1/job123/source.pdf'})
         upload_mock.assert_called_once()
         create_mock.assert_called_once()
+        process_mock.assert_called_once_with('job123', 'auto')
 
     def test_get_pdf_job_returns_owner_job(self) -> None:
         with (
@@ -102,6 +104,55 @@ class BackgroundJobRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {'jobId': 'job123', 'userId': 'u1', 'status': 'queued'})
         get_mock.assert_called_once_with('job123')
+
+    def test_get_pdf_job_markdown_returns_completed_output_for_owner(self) -> None:
+        with (
+            patch.object(main, 'verify_firebase_id_token', return_value={'uid': 'u1', 'email': 'approved@example.com', 'email_verified': True}),
+            patch.object(main, 'get_conversion_job', return_value={
+                'jobId': 'job123',
+                'userId': 'u1',
+                'status': 'completed',
+                'storageOutputPath': 'markdown-outputs/u1/job123/output.md',
+            }),
+            patch.object(main, 'download_text_from_storage', return_value='# converted') as download_mock,
+        ):
+            response = self.client.get('/api/jobs/pdf/job123/markdown', headers={'Authorization': 'Bearer valid-token'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {'markdown': '# converted'})
+        download_mock.assert_called_once_with('markdown-outputs/u1/job123/output.md')
+
+    def test_process_pdf_job_marks_job_completed_and_uploads_output(self) -> None:
+        with (
+            patch.object(main, 'get_conversion_job', return_value={
+                'jobId': 'job123',
+                'userId': 'u1',
+                'storageInputPath': 'pdf-inputs/u1/job123/source.pdf',
+                'originalFilename': 'sample.pdf',
+            }),
+            patch.object(main, 'download_bytes_from_storage', return_value=b'%PDF-1.4 sample'),
+            patch.object(main, 'improve_pdf_markdown', return_value='# converted'),
+            patch.object(main, 'upload_text_to_storage') as upload_mock,
+            patch.object(main, 'update_conversion_job') as update_mock,
+            patch.object(
+                main,
+                'get_settings',
+                return_value=SimpleNamespace(
+                    gemini_api_key='server-key',
+                    gemini_model='server-model',
+                    pdf_chunk_size=7,
+                ),
+            ),
+        ):
+            main.process_pdf_job('job123', 'CommonMark')
+
+        self.assertEqual(update_mock.call_args_list[0].args, ('job123', {'status': 'processing'}))
+        self.assertEqual(update_mock.call_args_list[1].args, ('job123', {
+            'status': 'completed',
+            'storageOutputPath': 'markdown-outputs/u1/job123/output.md',
+            'flavor': 'CommonMark',
+        }))
+        upload_mock.assert_called_once_with('markdown-outputs/u1/job123/output.md', '# converted')
 
 
 if __name__ == '__main__':

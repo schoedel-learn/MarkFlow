@@ -19,6 +19,7 @@ def create_job_record(
     user_id: str,
     user_email: str,
     filename: str,
+    flavor: str = 'auto',
     size_bytes: int,
     page_count: int,
     storage_input_path: str,
@@ -33,6 +34,7 @@ def create_job_record(
         'status': 'queued',
         'mode': 'background',
         'originalFilename': filename,
+        'flavor': flavor,
         'sizeBytes': size_bytes,
         'pageCount': page_count,
         'storageInputPath': storage_input_path,
@@ -47,6 +49,7 @@ def create_conversion_job(
     user_id: str,
     user_email: str,
     filename: str,
+    flavor: str = 'auto',
     size_bytes: int,
     page_count: int,
     firestore_client=None,
@@ -59,6 +62,7 @@ def create_conversion_job(
         user_id=user_id,
         user_email=user_email,
         filename=filename,
+        flavor=flavor,
         size_bytes=size_bytes,
         page_count=page_count,
         storage_input_path=storage_input_path,
@@ -73,3 +77,10 @@ def get_conversion_job(job_id: str, firestore_client=None) -> dict | None:
     if not snapshot.exists:
         return None
     return snapshot.to_dict()
+
+
+def update_conversion_job(job_id: str, updates: dict, firestore_client=None) -> None:
+    client = firestore_client or get_firestore_client()
+    payload = dict(updates)
+    payload['updatedAt'] = datetime.now(timezone.utc).isoformat()
+    client.collection('conversion_jobs').document(job_id).set(payload, merge=True)

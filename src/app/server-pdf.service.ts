@@ -17,6 +17,8 @@ export type ApprovedPdfJobStatus = 'queued' | 'processing' | 'completed' | 'fail
 export interface ApprovedPdfJob {
   jobId: string;
   status: ApprovedPdfJobStatus;
+  originalFilename?: string;
+  flavor?: string;
   storageInputPath?: string;
   storageOutputPath?: string;
   errorMessage?: string;
@@ -79,9 +81,10 @@ export class ServerPdfService {
     return data.markdown;
   }
 
-  async createApprovedPdfJob(file: File): Promise<ApprovedPdfJob> {
+  async createApprovedPdfJob(file: File, flavor: MarkdownFlavor): Promise<ApprovedPdfJob> {
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('flavor', flavor);
 
     const response = await fetch(`${this.apiBaseUrl}/jobs/pdf`, {
       method: 'POST',
@@ -99,6 +102,20 @@ export class ServerPdfService {
     });
 
     return this.parseResponse<ApprovedPdfJob>(response, 'Failed to fetch PDF conversion job status.');
+  }
+
+  async getApprovedPdfMarkdown(jobId: string): Promise<string> {
+    const response = await fetch(`${this.apiBaseUrl}/jobs/pdf/${jobId}/markdown`, {
+      method: 'GET',
+      headers: await this.getAuthorizedHeaders(),
+    });
+
+    const data = await this.parseResponse<MarkdownResponse>(response, 'Failed to fetch completed PDF markdown.');
+    if (!('markdown' in data) || typeof data.markdown !== 'string') {
+      throw new Error('Completed PDF job returned an invalid markdown payload.');
+    }
+
+    return data.markdown;
   }
 
   async pollApprovedPdfJob(

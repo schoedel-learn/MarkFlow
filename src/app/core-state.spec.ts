@@ -17,7 +17,7 @@ describe('CoreStateService', () => {
   let service: CoreStateService;
   let converter: Pick<ConverterService, 'inspectPdf' | 'pdfToMd' | 'docxToMd'>;
   let entitlement: Pick<EntitlementService, 'resolveMode'>;
-  let serverPdf: Pick<ServerPdfService, 'convertApprovedPdfSync' | 'createApprovedPdfJob' | 'pollApprovedPdfJob'>;
+  let serverPdf: Pick<ServerPdfService, 'convertApprovedPdfSync' | 'createApprovedPdfJob' | 'pollApprovedPdfJob' | 'getApprovedPdfMarkdown'>;
 
   beforeEach(() => {
     converter = {
@@ -31,7 +31,8 @@ describe('CoreStateService', () => {
     serverPdf = {
       convertApprovedPdfSync: vi.fn(),
       createApprovedPdfJob: vi.fn(),
-      pollApprovedPdfJob: vi.fn()
+      pollApprovedPdfJob: vi.fn(),
+      getApprovedPdfMarkdown: vi.fn()
     };
 
     TestBed.configureTestingModule({
@@ -123,17 +124,41 @@ describe('CoreStateService', () => {
     } as any);
     vi.mocked(serverPdf.pollApprovedPdfJob).mockResolvedValue({
       jobId: 'job-123',
-      status: 'queued'
+      status: 'queued',
+      originalFilename: 'large-approved.pdf'
     } as any);
     service.selectedFile.set(new File([new Uint8Array(APPROVED_PDF_SYNC_MAX_BYTES + 1)], 'large-approved.pdf', { type: 'application/pdf' }));
 
     await service.convertToMarkdown({ showProfileMenuFn: vi.fn() });
     await Promise.resolve();
 
-    expect(serverPdf.createApprovedPdfJob).toHaveBeenCalledTimes(1);
+    expect(serverPdf.createApprovedPdfJob).toHaveBeenCalledWith(expect.any(File), 'auto');
     expect(serverPdf.pollApprovedPdfJob).toHaveBeenCalledWith('job-123');
     expect(serverPdf.convertApprovedPdfSync).not.toHaveBeenCalled();
     expect(service.approvedPdfJob()).toEqual(expect.objectContaining({ jobId: 'job-123', status: 'queued' }));
+  });
+
+  it('downloads markdown when an approved background job completes', async () => {
+    vi.mocked(entitlement.resolveMode).mockResolvedValue('approved_server');
+    vi.mocked(serverPdf.createApprovedPdfJob).mockResolvedValue({
+      jobId: 'job-123',
+      status: 'queued',
+      storageInputPath: 'pdf-inputs/u1/job-123/source.pdf'
+    } as any);
+    vi.mocked(serverPdf.pollApprovedPdfJob).mockResolvedValue({
+      jobId: 'job-123',
+      status: 'completed',
+      storageOutputPath: 'markdown-outputs/u1/job-123/output.md',
+      originalFilename: 'large-approved.pdf'
+    } as any);
+    vi.mocked(serverPdf.getApprovedPdfMarkdown).mockResolvedValue('# converted');
+    service.selectedFile.set(new File([new Uint8Array(APPROVED_PDF_SYNC_MAX_BYTES + 1)], 'large-approved.pdf', { type: 'application/pdf' }));
+
+    await service.convertToMarkdown({ showProfileMenuFn: vi.fn() });
+    await Promise.resolve();
+
+    expect(serverPdf.getApprovedPdfMarkdown).toHaveBeenCalledWith('job-123');
+    expect((service as any).downloadFile).toHaveBeenCalledWith('# converted', 'large-approved.md', 'text/markdown');
   });
 
   it('does not block non-PDF markdown conversions on entitlement lookup', async () => {
