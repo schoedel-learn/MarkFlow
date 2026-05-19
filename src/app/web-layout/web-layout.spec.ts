@@ -26,6 +26,7 @@ describe('WebLayoutComponent', () => {
       processingAction: signal<'pdf' | 'docx' | 'md' | 'txt' | null>(null),
       hasConverted: signal(false),
       entitlementMode: signal<'public_byok' | 'approved_server'>('public_byok'),
+      approvedPdfJob: signal<any>(null),
       saveGeminiKey: () => {},
       toggleRememberKey: () => {},
       logout: async () => {},
@@ -72,5 +73,15 @@ describe('WebLayoutComponent', () => {
     const text = fixture.nativeElement.textContent;
     expect(text).toContain('approved for server-managed PDF conversion');
     expect(text).not.toContain('barry@schoedeldesign.ai');
+  });
+
+  it('shows queued approved PDF background job status', () => {
+    state.entitlementMode.set('approved_server');
+    state.approvedPdfJob.set({ jobId: 'job-123', status: 'queued' });
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain('PDF background job queued');
+    expect(text).toContain('job-123');
   });
 });

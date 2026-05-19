@@ -5,8 +5,15 @@ import { auth, signInWithGoogle, logOut, db } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, setDoc, getDoc, collection, addDoc, writeBatch, increment } from 'firebase/firestore';
 import { EntitlementMode, EntitlementService } from './entitlement.service';
-import { buildPublicPdfLimitMessage, exceedsPublicPdfPolicy, PdfInspectionMetadata, PUBLIC_PDF_MAX_BYTES } from './pdf-access-policy';
-import { ServerPdfService } from './server-pdf.service';
+import {
+  APPROVED_PDF_SYNC_MAX_BYTES,
+  buildPublicPdfLimitMessage,
+  exceedsApprovedPdfSyncPolicy,
+  exceedsPublicPdfPolicy,
+  PdfInspectionMetadata,
+  PUBLIC_PDF_MAX_BYTES,
+} from './pdf-access-policy';
+import { ApprovedPdfJob, ServerPdfService } from './server-pdf.service';
 
 export type ConversionMode = 'md-to-doc' | 'doc-to-md';
 
@@ -25,6 +32,7 @@ export class CoreStateService {
   processingAction = signal<'pdf' | 'docx' | 'md' | 'txt' | null>(null);
   error = signal<string | null>(null);
   entitlementMode = signal<EntitlementMode>('public_byok');
+  approvedPdfJob = signal<ApprovedPdfJob | null>(null);
   
   // Auth & AI Key
   user = signal<User | null>(null);
@@ -164,6 +172,7 @@ export class CoreStateService {
     this.convertedText.set(null);
     this.error.set(null);
     this.hasConverted.set(false);
+    this.approvedPdfJob.set(null);
   }
 
   async canConvert(requireAuthOptions: { showProfileMenuFn: () => void; allowMissingGeminiKey?: boolean } = { showProfileMenuFn: () => {} }): Promise<boolean> {
@@ -254,6 +263,40 @@ export class CoreStateService {
 
     this.error.set(buildPublicPdfLimitMessage(metadata));
     return false;
+  }
+
+  private async shouldUseApprovedBackgroundJob(file: File): Promise<boolean> {
+    if (file.size > APPROVED_PDF_SYNC_MAX_BYTES) {
+      return true;
+    }
+
+    try {
+      const metadata = await this.getPdfMetadata(file);
+      return exceedsApprovedPdfSyncPolicy(metadata);
+    } catch (error) {
+      console.warn('Failed to inspect approved PDF for sync routing, defaulting to background job.', error);
+      return true;
+    }
+  }
+
+  private startApprovedPdfJobPolling(jobId: string): void {
+    void this.serverPdfService.pollApprovedPdfJob(jobId)
+      .then(async (job) => {
+        this.approvedPdfJob.set(job);
+
+        if (job.status === 'completed') {
+          await this.incrementConversionCount();
+          return;
+        }
+
+        if (job.status === 'failed') {
+          this.error.set(job.errorMessage || 'Approved PDF background job failed.');
+        }
+      })
+      .catch(async (error) => {
+        console.error('Failed to poll approved PDF job', error);
+        await this.logErrorToFirestore('approvedPdfJobPolling', error, { jobId });
+      });
   }
 
   async incrementConversionCount() {
@@ -353,6 +396,8 @@ export class CoreStateService {
     const file = this.selectedFile();
     if (!file) return;
 
+    this.approvedPdfJob.set(null);
+
     const isPdf = this.isPdfFile(file);
     let allowServerManagedPdf = false;
 
@@ -376,6 +421,13 @@ export class CoreStateService {
         md = await this.converter.docxToMd(file, this.markdownFlavor(), this.geminiKey());
       } else if (file.name.endsWith('.pdf')) {
         if (allowServerManagedPdf) {
+          if (await this.shouldUseApprovedBackgroundJob(file)) {
+            const job = await this.serverPdfService.createApprovedPdfJob(file);
+            this.approvedPdfJob.set(job);
+            this.startApprovedPdfJobPolling(job.jobId);
+            return;
+          }
+
           md = await this.serverPdfService.convertApprovedPdfSync(file, this.markdownFlavor());
         } else {
           md = await this.converter.pdfToMd(file, this.markdownFlavor(), this.geminiKey());

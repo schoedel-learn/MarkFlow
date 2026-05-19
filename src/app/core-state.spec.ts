@@ -5,14 +5,19 @@ import { vi } from 'vitest';
 import { ConverterService } from './converter.service';
 import { CoreStateService } from './core-state';
 import { APPROVED_USER_LOOKUP, EntitlementService } from './entitlement.service';
-import { buildPublicPdfLimitMessage, PUBLIC_PDF_MAX_BYTES, PUBLIC_PDF_MAX_PAGES } from './pdf-access-policy';
+import {
+  APPROVED_PDF_SYNC_MAX_BYTES,
+  buildPublicPdfLimitMessage,
+  PUBLIC_PDF_MAX_BYTES,
+  PUBLIC_PDF_MAX_PAGES,
+} from './pdf-access-policy';
 import { ServerPdfService } from './server-pdf.service';
 
 describe('CoreStateService', () => {
   let service: CoreStateService;
   let converter: Pick<ConverterService, 'inspectPdf' | 'pdfToMd' | 'docxToMd'>;
   let entitlement: Pick<EntitlementService, 'resolveMode'>;
-  let serverPdf: Pick<ServerPdfService, 'convertApprovedPdfSync'>;
+  let serverPdf: Pick<ServerPdfService, 'convertApprovedPdfSync' | 'createApprovedPdfJob' | 'pollApprovedPdfJob'>;
 
   beforeEach(() => {
     converter = {
@@ -24,7 +29,9 @@ describe('CoreStateService', () => {
       resolveMode: vi.fn()
     };
     serverPdf = {
-      convertApprovedPdfSync: vi.fn()
+      convertApprovedPdfSync: vi.fn(),
+      createApprovedPdfJob: vi.fn(),
+      pollApprovedPdfJob: vi.fn()
     };
 
     TestBed.configureTestingModule({
@@ -76,19 +83,22 @@ describe('CoreStateService', () => {
 
   it('lets approved users bypass the public PDF block', async () => {
     vi.mocked(entitlement.resolveMode).mockResolvedValue('approved_server');
+    vi.mocked(converter.inspectPdf).mockResolvedValue({ pageCount: 2, sizeBytes: 1024 });
     vi.mocked(serverPdf.convertApprovedPdfSync).mockResolvedValue('# converted');
     service.selectedFile.set(new File(['pdf'], 'large.pdf', { type: 'application/pdf' }));
 
     await service.convertToMarkdown({ showProfileMenuFn: vi.fn() });
 
     expect(service.entitlementMode()).toBe('approved_server');
-    expect(converter.inspectPdf).not.toHaveBeenCalled();
+    expect(converter.inspectPdf).toHaveBeenCalledTimes(1);
     expect(converter.pdfToMd).not.toHaveBeenCalled();
     expect(serverPdf.convertApprovedPdfSync).toHaveBeenCalledTimes(1);
+    expect(serverPdf.createApprovedPdfJob).not.toHaveBeenCalled();
   });
 
   it('lets approved users convert PDFs without a Gemini key', async () => {
     vi.mocked(entitlement.resolveMode).mockResolvedValue('approved_server');
+    vi.mocked(converter.inspectPdf).mockResolvedValue({ pageCount: 2, sizeBytes: 1024 });
     vi.mocked(serverPdf.convertApprovedPdfSync).mockResolvedValue('# converted');
     service.geminiKey.set('');
     service.selectedFile.set(new File(['pdf'], 'approved.pdf', { type: 'application/pdf' }));
@@ -101,6 +111,29 @@ describe('CoreStateService', () => {
     expect(service.error()).toBeNull();
     expect(converter.pdfToMd).not.toHaveBeenCalled();
     expect(serverPdf.convertApprovedPdfSync).toHaveBeenCalledWith(expect.any(File), 'auto');
+    expect(serverPdf.createApprovedPdfJob).not.toHaveBeenCalled();
+  });
+
+  it('queues large approved PDFs as background jobs and starts polling', async () => {
+    vi.mocked(entitlement.resolveMode).mockResolvedValue('approved_server');
+    vi.mocked(serverPdf.createApprovedPdfJob).mockResolvedValue({
+      jobId: 'job-123',
+      status: 'queued',
+      storageInputPath: 'pdf-inputs/u1/job-123/source.pdf'
+    } as any);
+    vi.mocked(serverPdf.pollApprovedPdfJob).mockResolvedValue({
+      jobId: 'job-123',
+      status: 'queued'
+    } as any);
+    service.selectedFile.set(new File([new Uint8Array(APPROVED_PDF_SYNC_MAX_BYTES + 1)], 'large-approved.pdf', { type: 'application/pdf' }));
+
+    await service.convertToMarkdown({ showProfileMenuFn: vi.fn() });
+    await Promise.resolve();
+
+    expect(serverPdf.createApprovedPdfJob).toHaveBeenCalledTimes(1);
+    expect(serverPdf.pollApprovedPdfJob).toHaveBeenCalledWith('job-123');
+    expect(serverPdf.convertApprovedPdfSync).not.toHaveBeenCalled();
+    expect(service.approvedPdfJob()).toEqual(expect.objectContaining({ jobId: 'job-123', status: 'queued' }));
   });
 
   it('does not block non-PDF markdown conversions on entitlement lookup', async () => {

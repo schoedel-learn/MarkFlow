@@ -169,4 +169,8 @@ export class WebLayoutComponent {
   get isApprovedUser() {
     return this.state.entitlementMode() === 'approved_server';
   }
+
+  get showApprovedPdfJobNotice() {
+    return this.state.mode() === 'doc-to-md' && !!this.state.approvedPdfJob();
+  }
 }

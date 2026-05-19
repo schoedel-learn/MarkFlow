@@ -1,6 +1,8 @@
 export const PUBLIC_PDF_MAX_BYTES = 10 * 1024 * 1024;
 export const PUBLIC_PDF_MAX_PAGES = 25;
 export const PUBLIC_PDF_CONTACT_EMAIL = 'barry@schoedeldesign.ai';
+export const APPROVED_PDF_SYNC_MAX_BYTES = 5 * 1024 * 1024;
+export const APPROVED_PDF_SYNC_MAX_PAGES = 15;
 
 export interface PdfInspectionMetadata {
   pageCount: number;
@@ -9,6 +11,10 @@ export interface PdfInspectionMetadata {
 
 export function exceedsPublicPdfPolicy(metadata: PdfInspectionMetadata): boolean {
   return metadata.sizeBytes > PUBLIC_PDF_MAX_BYTES || metadata.pageCount > PUBLIC_PDF_MAX_PAGES;
+}
+
+export function exceedsApprovedPdfSyncPolicy(metadata: PdfInspectionMetadata): boolean {
+  return metadata.sizeBytes > APPROVED_PDF_SYNC_MAX_BYTES || metadata.pageCount > APPROVED_PDF_SYNC_MAX_PAGES;
 }
 
 export function buildPublicPdfLimitMessage(metadata?: Partial<PdfInspectionMetadata>): string {

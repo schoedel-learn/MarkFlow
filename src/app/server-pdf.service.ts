@@ -12,11 +12,46 @@ interface ErrorResponse {
   detail?: string;
 }
 
+export type ApprovedPdfJobStatus = 'queued' | 'processing' | 'completed' | 'failed';
+
+export interface ApprovedPdfJob {
+  jobId: string;
+  status: ApprovedPdfJobStatus;
+  storageInputPath?: string;
+  storageOutputPath?: string;
+  errorMessage?: string;
+  updatedAt?: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class ServerPdfService {
   private readonly apiBaseUrl = environment.apiBaseUrl;
+
+  private async getAuthorizedHeaders(): Promise<HeadersInit> {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      throw new Error('You must be signed in to use server-managed PDF conversion.');
+    }
+
+    const idToken = await currentUser.getIdToken();
+    return {
+      Authorization: `Bearer ${idToken}`,
+    };
+  }
+
+  private async parseResponse<T>(response: Response, fallbackMessage: string): Promise<T> {
+    const data = await response.json() as T | ErrorResponse;
+    if (!response.ok) {
+      const detail = typeof data === 'object' && data !== null && 'detail' in data
+        ? (data as ErrorResponse).detail
+        : undefined;
+      throw new Error(detail || fallbackMessage);
+    }
+
+    return data as T;
+  }
 
   async convertApprovedPdfSync(file: File, flavor: MarkdownFlavor): Promise<string> {
     const currentUser = auth.currentUser;
@@ -24,7 +59,6 @@ export class ServerPdfService {
       throw new Error('You must be signed in to use server-managed PDF conversion.');
     }
 
-    const idToken = await currentUser.getIdToken();
     const formData = new FormData();
     formData.append('file', file);
     formData.append('user_email', currentUser.email ?? '');
@@ -32,22 +66,58 @@ export class ServerPdfService {
 
     const response = await fetch(`${this.apiBaseUrl}/convert/pdf/approved-sync`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${idToken}`,
-      },
+      headers: await this.getAuthorizedHeaders(),
       body: formData,
     });
 
-    const data = await response.json() as MarkdownResponse | ErrorResponse;
-    if (!response.ok) {
-      const detail = 'detail' in data ? data.detail : undefined;
-      throw new Error(detail || 'Server-managed PDF conversion failed.');
-    }
+    const data = await this.parseResponse<MarkdownResponse>(response, 'Server-managed PDF conversion failed.');
 
     if (!('markdown' in data) || typeof data.markdown !== 'string') {
       throw new Error('Server-managed PDF conversion returned an invalid response.');
     }
 
     return data.markdown;
+  }
+
+  async createApprovedPdfJob(file: File): Promise<ApprovedPdfJob> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(`${this.apiBaseUrl}/jobs/pdf`, {
+      method: 'POST',
+      headers: await this.getAuthorizedHeaders(),
+      body: formData,
+    });
+
+    return this.parseResponse<ApprovedPdfJob>(response, 'Failed to queue server-managed PDF conversion.');
+  }
+
+  async getApprovedPdfJob(jobId: string): Promise<ApprovedPdfJob> {
+    const response = await fetch(`${this.apiBaseUrl}/jobs/pdf/${jobId}`, {
+      method: 'GET',
+      headers: await this.getAuthorizedHeaders(),
+    });
+
+    return this.parseResponse<ApprovedPdfJob>(response, 'Failed to fetch PDF conversion job status.');
+  }
+
+  async pollApprovedPdfJob(
+    jobId: string,
+    options: { maxAttempts?: number; intervalMs?: number } = {},
+  ): Promise<ApprovedPdfJob> {
+    const maxAttempts = options.maxAttempts ?? 12;
+    const intervalMs = options.intervalMs ?? 5000;
+
+    let latestJob = await this.getApprovedPdfJob(jobId);
+    for (let attempt = 1; attempt < maxAttempts; attempt += 1) {
+      if (latestJob.status === 'completed' || latestJob.status === 'failed') {
+        return latestJob;
+      }
+
+      await new Promise((resolve) => window.setTimeout(resolve, intervalMs));
+      latestJob = await this.getApprovedPdfJob(jobId);
+    }
+
+    return latestJob;
   }
 }
