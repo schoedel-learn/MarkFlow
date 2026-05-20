@@ -26,9 +26,9 @@
           <button 
             (click)="toggleProfileMenu()" 
             title="Profile"
-            class="block w-12 h-12 rounded-full border-2 border-transparent hover:border-stone-400 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-stone-400 overflow-hidden bg-stone-100"
+            class="block w-12 h-12 p-0.5 rounded-full ring-1 ring-stone-400/40 hover:ring-stone-400 hover:shadow-md transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-400 overflow-hidden bg-stone-100 shadow-sm"
           >
-            <img [src]="state.user()?.photoURL" alt="Profile" class="w-full h-full object-cover">
+            <img [src]="state.user()?.photoURL" alt="Profile" class="w-full h-full rounded-full object-cover object-[center_25%]">
           </button>
 
           @if (isProfileMenuOpen()) {
