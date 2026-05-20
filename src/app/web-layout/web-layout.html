@@ -235,13 +235,6 @@
       </button>
     </div>
 
-    @if (showPdfAccessNotice && isApprovedUser) {
-      <div class="mb-8 rounded-2xl border border-stone-200 bg-white/80 px-5 py-4 text-sm text-stone-600 shadow-sm">
-        <p class="font-medium text-stone-800">Your account is approved for server-managed PDF conversion.</p>
-        <p class="mt-1 text-stone-500">Large PDFs bypass the public browser limit and use the managed MarkFlow service automatically. Small approved PDFs stay on the synchronous server path; larger ones are queued as background jobs.</p>
-      </div>
-    }
-
     @if (showApprovedPdfJobNotice) {
       <div class="mb-8 rounded-2xl border border-amber-200 bg-amber-50/80 px-5 py-4 text-sm text-amber-900 shadow-sm">
         @if (state.approvedPdfJob()?.status === 'queued') {
@@ -485,28 +478,35 @@
     }
   </div>
 
-  <!-- PDF Size Limits Card (permanent) -->
-  <div class="glass-card w-full max-w-2xl mt-6 p-6 md:p-8 text-sm text-stone-600 animate-in fade-in duration-500">
-    <p class="font-medium text-stone-800">Public PDF-to-Markdown is limited to 10 MB and 25 pages.</p>
-    <p class="mt-2 text-stone-500">Larger files require our robust backend tools. For increased access, email
-      <span class="inline-flex items-center gap-1 align-middle">
-        <span class="font-mono text-stone-700">{{ publicPdfContactEmail }}</span>
-        <button
-          type="button"
-          (click)="copyContactEmail()"
-          [attr.aria-label]="contactEmailCopied() ? 'Email address copied' : 'Copy email address'"
-          [title]="contactEmailCopied() ? 'Copied!' : 'Copy email address'"
-          class="inline-flex items-center justify-center rounded-md p-1 text-stone-500 hover:text-stone-800 hover:bg-stone-100 transition-colors"
-        >
-          <mat-icon class="text-base" style="font-size:16px;width:16px;height:16px;line-height:16px;">{{ contactEmailCopied() ? 'check' : 'content_copy' }}</mat-icon>
-        </button>
-        @if (contactEmailCopied()) {
-          <span class="text-xs text-green-700" aria-live="polite">Copied!</span>
-        }
-      </span>
-      with subject &ldquo;Markflow Increased Access&rdquo;.
-    </p>
-  </div>
+  <!-- PDF Access Card (permanent) -->
+  @if (isApprovedUser) {
+    <div class="glass-card w-full max-w-2xl mt-6 p-6 md:p-8 text-sm text-stone-600 animate-in fade-in duration-500">
+      <p class="font-medium text-stone-800">Your account is approved for server-managed PDF conversion.</p>
+      <p class="mt-2 text-stone-500">Large PDFs bypass the public browser limit and use the managed MarkFlow service automatically. Small approved PDFs stay on the synchronous server path; larger ones are queued as background jobs.</p>
+    </div>
+  } @else {
+    <div class="glass-card w-full max-w-2xl mt-6 p-6 md:p-8 text-sm text-stone-600 animate-in fade-in duration-500">
+      <p class="font-medium text-stone-800">Public PDF-to-Markdown is limited to 10 MB and 25 pages.</p>
+      <p class="mt-2 text-stone-500">Larger files require our robust backend tools. For increased access, email
+        <span class="inline-flex items-center gap-1 align-middle">
+          <span class="font-mono text-stone-700">{{ publicPdfContactEmail }}</span>
+          <button
+            type="button"
+            (click)="copyContactEmail()"
+            [attr.aria-label]="contactEmailCopied() ? 'Email address copied' : 'Copy email address'"
+            [title]="contactEmailCopied() ? 'Copied!' : 'Copy email address'"
+            class="inline-flex items-center justify-center rounded-md p-1 text-stone-500 hover:text-stone-800 hover:bg-stone-100 transition-colors"
+          >
+            <mat-icon class="text-base" style="font-size:16px;width:16px;height:16px;line-height:16px;">{{ contactEmailCopied() ? 'check' : 'content_copy' }}</mat-icon>
+          </button>
+          @if (contactEmailCopied()) {
+            <span class="text-xs text-green-700" aria-live="polite">Copied!</span>
+          }
+        </span>
+        with subject &ldquo;Markflow Increased Access&rdquo;.
+      </p>
+    </div>
+  }
   }
 
   <!-- Bug Report Modal -->
