@@ -6,6 +6,7 @@ import { db } from '../firebase';
 import { collection, addDoc } from 'firebase/firestore';
 import { PUBLIC_PDF_CONTACT_EMAIL } from '../pdf-access-policy';
 import { BackendKeyStatus, ServerPdfService } from '../server-pdf.service';
+import { ThemeService, ThemePreference } from '../theme.service';
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -17,8 +18,10 @@ import { BackendKeyStatus, ServerPdfService } from '../server-pdf.service';
 })
 export class WebLayoutComponent {
   public state = inject(CoreStateService);
+  public theme = inject(ThemeService);
   private readonly serverPdf = inject(ServerPdfService);
   readonly publicPdfContactEmail = PUBLIC_PDF_CONTACT_EMAIL;
+  readonly themeOptions: ThemePreference[] = ['auto', 'light', 'dark'];
 
   // UI State specific to web layout
   isProfileMenuOpen = signal<boolean>(false);
@@ -70,6 +73,10 @@ export class WebLayoutComponent {
 
   closeProfileMenu() {
     this.isProfileMenuOpen.set(false);
+  }
+
+  setThemePreference(pref: ThemePreference) {
+    this.theme.setPreference(pref);
   }
 
   updateBackendKeyInput(value: string) {

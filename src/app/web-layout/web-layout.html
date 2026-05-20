@@ -1,6 +1,18 @@
 <main class="min-h-screen p-4 md:p-8 flex flex-col items-center justify-center bg-stone-50 relative">
   <!-- User Profile / Login -->
   <div class="absolute top-4 right-4 md:top-8 md:right-8 z-50 flex items-center gap-4">
+    <button
+      type="button"
+      (click)="theme.cycle()"
+      [title]="'Theme: ' + theme.preference() + ' (resolved: ' + theme.resolved() + '). Click to cycle.'"
+      class="flex items-center justify-center w-12 h-12 rounded-full border-2 border-transparent hover:border-stone-400 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-stone-400 bg-stone-100 text-stone-500 hover:text-stone-800"
+    >
+      @switch (theme.preference()) {
+        @case ('dark') { <mat-icon>dark_mode</mat-icon> }
+        @case ('light') { <mat-icon>light_mode</mat-icon> }
+        @default { <mat-icon>contrast</mat-icon> }
+      }
+    </button>
     @if (state.isAuthReady()) {
       @if (state.user()) {
         <button 
@@ -27,6 +39,31 @@
                 <p class="text-xs text-stone-500 truncate">{{ state.user()?.email }}</p>
               </div>
               
+              <div class="px-4 py-4 border-b border-stone-100 bg-stone-50/50">
+                <div class="flex items-center gap-2 mb-2">
+                  <mat-icon class="text-stone-400 text-sm scale-75">contrast</mat-icon>
+                  <p class="text-xs font-semibold text-stone-700 uppercase tracking-wider">Appearance</p>
+                </div>
+                <div class="flex gap-1 p-1 bg-stone-100 rounded-lg">
+                  @for (option of themeOptions; track option) {
+                    <button
+                      type="button"
+                      (click)="setThemePreference(option)"
+                      [class.bg-white]="theme.preference() === option"
+                      [class.shadow-sm]="theme.preference() === option"
+                      [class.text-stone-900]="theme.preference() === option"
+                      [class.text-stone-500]="theme.preference() !== option"
+                      class="flex-1 capitalize text-xs font-medium px-2 py-1.5 rounded-md transition-colors hover:text-stone-800"
+                    >
+                      {{ option }}
+                    </button>
+                  }
+                </div>
+                <p class="mt-2 text-[10px] text-stone-500">
+                  Auto follows your browser. New users start in dark mode.
+                </p>
+              </div>
+
               <div class="px-4 py-4 border-b border-stone-100 bg-stone-50/50">
                 <div class="flex items-center gap-2 mb-2">
                   <mat-icon class="text-stone-400 text-sm scale-75">shield</mat-icon>

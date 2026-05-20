@@ -5,7 +5,28 @@
     <title>MarkFlow - Document Converter</title>
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <script>
+      // Resolve theme before first paint to avoid a light-mode flash.
+      // Stored preference wins; otherwise inherit from the browser and
+      // default to dark when no system preference is expressed.
+      (function () {
+        try {
+          var stored = localStorage.getItem('markflow-theme');
+          var mode = stored === 'light' || stored === 'dark' ? stored : null;
+          if (!mode) {
+            var prefersLight =
+              window.matchMedia &&
+              window.matchMedia('(prefers-color-scheme: light)').matches;
+            mode = prefersLight ? 'light' : 'dark';
+          }
+          document.documentElement.setAttribute('data-theme', mode);
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      })();
+    </script>
   </head>
   <body class="bg-stone-50">
     <app-root>

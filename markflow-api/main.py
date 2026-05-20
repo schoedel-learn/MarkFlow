@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from firebase_admin import auth as firebase_auth
 
 from entitlements import is_approved_user
+from firebase_admin_client import get_firebase_app
 from job_store import build_storage_paths, create_conversion_job, get_conversion_job, update_conversion_job
 from pdf_pipeline import count_pdf_pages, improve_pdf_markdown
 from settings import get_settings
@@ -29,6 +30,11 @@ async def health_check():
 
 
 def verify_firebase_id_token(token: str) -> dict:
+    # Ensure the default Firebase app is initialized before verifying tokens.
+    # firebase_auth.verify_id_token requires an initialized app, and earlier
+    # request paths relied on side effects (e.g. Firestore lookups) to set it
+    # up, which is fragile when auth runs first.
+    get_firebase_app()
     return firebase_auth.verify_id_token(token)
 
 
@@ -47,6 +53,7 @@ def _get_verified_user_email(authorization: str | None) -> str:
     try:
         decoded_token = verify_firebase_id_token(token)
     except Exception as exc:  # pragma: no cover - exact SDK errors are patched in tests
+        print(f"[auth] verify_id_token failed (email helper): {exc}")
         raise HTTPException(status_code=401, detail="Invalid authentication token") from exc
 
     email = decoded_token.get("email")
@@ -60,13 +67,15 @@ def _get_verified_user_identity(authorization: str | None) -> dict[str, str]:
     try:
         decoded_token = verify_firebase_id_token(token)
     except Exception as exc:  # pragma: no cover - exact SDK errors are patched in tests
+        print(f"[auth] verify_id_token failed: {exc}")
         raise HTTPException(status_code=401, detail="Invalid authentication token") from exc
 
     email = decoded_token.get("email")
-    uid = decoded_token.get("uid")
+    uid = decoded_token.get("uid") or decoded_token.get("sub") or decoded_token.get("user_id")
     if not email or not decoded_token.get("email_verified"):
         raise HTTPException(status_code=403, detail="Verified email required")
     if not uid:
+        print(f"[auth] decoded token missing uid; keys={list(decoded_token.keys())}")
         raise HTTPException(status_code=401, detail="Invalid authentication token")
     return {"uid": uid, "email": email}
 
