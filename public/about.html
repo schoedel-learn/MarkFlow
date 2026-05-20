@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>About MarkFlow — AI Markdown Converter by Schoedel Design</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#0c0a09" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)" />
+    <meta
+      name="description"
+      content="MarkFlow is a free AI-powered Markdown converter built by Schoedel Design. Learn what it does, how it works, and who's behind it."
+    />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" href="https://md.schoedeldesign.ai/about" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="MarkFlow" />
+    <meta property="og:title" content="About MarkFlow" />
+    <meta
+      property="og:description"
+      content="MarkFlow is a free AI-powered Markdown converter built by Schoedel Design."
+    />
+    <meta property="og:url" content="https://md.schoedeldesign.ai/about" />
+    <meta property="og:image" content="https://md.schoedeldesign.ai/og-image.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="stylesheet" href="/static-pages.css" />
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('markflow-theme');
+          var mode = stored === 'light' || stored === 'dark' ? stored : null;
+          if (!mode) {
+            var prefersLight =
+              window.matchMedia &&
+              window.matchMedia('(prefers-color-scheme: light)').matches;
+            mode = prefersLight ? 'light' : 'dark';
+          }
+          document.documentElement.setAttribute('data-theme', mode);
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <header class="page-header">
+      <a href="/" class="brand">MarkFlow</a>
+      <nav>
+        <a href="/">Converter</a>
+        <a href="/about" aria-current="page">About</a>
+        <a href="/faq">FAQ</a>
+      </nav>
+    </header>
+
+    <main class="page">
+      <article class="prose">
+        <h1>About MarkFlow</h1>
+        <p class="lead">
+          MarkFlow is a free, AI-powered Markdown converter that turns PDFs,
+          Word documents, and HTML into clean, structured Markdown — and renders
+          Markdown back into beautifully formatted documents.
+        </p>
+
+        <h2>Why it exists</h2>
+        <p>
+          Most "convert to Markdown" tools either produce a wall of garbled
+          text or strip out everything that matters. MarkFlow uses Google
+          Gemini to actually <em>understand</em> document structure — headings,
+          lists, tables, footnotes, code blocks — and preserves it faithfully.
+          The result is Markdown you can paste straight into a wiki, a static
+          site, or a long-form note system without spending an hour cleaning
+          it up.
+        </p>
+
+        <h2>What you can do with it</h2>
+        <ul>
+          <li><strong>PDF → Markdown</strong> — including scanned PDFs and complex layouts.</li>
+          <li><strong>Word (.docx) → Markdown</strong> — tables, lists, and inline formatting preserved.</li>
+          <li><strong>HTML → Markdown</strong> — paste a URL or raw HTML and get clean prose.</li>
+          <li><strong>Markdown → PDF / Word / HTML</strong> — render your notes into a polished, shareable document.</li>
+        </ul>
+
+        <h2>Privacy</h2>
+        <p>
+          Files you upload are processed in your browser and (when needed) on
+          our Cloud Run backend. We don't sell your data, train models on your
+          documents, or hold onto files longer than the conversion needs.
+          Bring-your-own-Gemini-key is supported if you want the request to
+          go directly from your browser to Google.
+        </p>
+
+        <h2>Who built this</h2>
+        <p>
+          MarkFlow is built by
+          <a href="https://schoedeldesign.ai" target="_blank" rel="noopener">Schoedel Design</a>,
+          an independent studio focused on practical AI tools and thoughtful
+          software. We also write about how we build —
+          <a href="https://schoedeldesign.ai/blog" target="_blank" rel="noopener">read the blog</a>
+          for behind-the-scenes notes on tools like this one.
+        </p>
+
+        <h2>Get in touch</h2>
+        <p>
+          Bug reports, feature requests, or you just want larger limits —
+          email <a href="mailto:barry@schoedeldesign.ai">barry@schoedeldesign.ai</a>.
+        </p>
+
+        <p class="cta-row">
+          <a class="cta" href="/">Try the converter →</a>
+          <a class="cta cta-secondary" href="/faq">Read the FAQ</a>
+        </p>
+      </article>
+    </main>
+
+    <footer class="page-footer">
+      <a href="https://schoedeldesign.ai" target="_blank" rel="noopener">Schoedel Design</a>
+      <span>·</span>
+      <a href="https://schoedeldesign.ai/blog" target="_blank" rel="noopener">Blog</a>
+      <span>·</span>
+      <a href="/about">About</a>
+      <span>·</span>
+      <a href="/faq">FAQ</a>
+      <span>·</span>
+      <span>&copy; 2026 Schoedel Design</span>
+    </footer>
+  </body>
+</html>

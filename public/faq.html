@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>MarkFlow FAQ — Common Questions About AI Markdown Conversion</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#0c0a09" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)" />
+    <meta
+      name="description"
+      content="Answers to common questions about MarkFlow: supported file types, size limits, privacy, pricing, AI used, and how to get expanded access."
+    />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" href="https://md.schoedeldesign.ai/faq" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="MarkFlow" />
+    <meta property="og:title" content="MarkFlow FAQ" />
+    <meta
+      property="og:description"
+      content="Common questions about MarkFlow: supported files, size limits, privacy, and pricing."
+    />
+    <meta property="og:url" content="https://md.schoedeldesign.ai/faq" />
+    <meta property="og:image" content="https://md.schoedeldesign.ai/og-image.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="stylesheet" href="/static-pages.css" />
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('markflow-theme');
+          var mode = stored === 'light' || stored === 'dark' ? stored : null;
+          if (!mode) {
+            var prefersLight =
+              window.matchMedia &&
+              window.matchMedia('(prefers-color-scheme: light)').matches;
+            mode = prefersLight ? 'light' : 'dark';
+          }
+          document.documentElement.setAttribute('data-theme', mode);
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      })();
+    </script>
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "What file types does MarkFlow support?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "MarkFlow converts PDF, Microsoft Word (.docx), and HTML into Markdown, and renders Markdown back into PDF, Word, or HTML. Plain text and rich-text inputs are also supported."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is MarkFlow free?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. The public converter is free to use. If you bring your own Google Gemini API key, requests go straight from your browser to Google and there are no MarkFlow-side limits."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "What are the size limits for public PDF conversion?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Public PDF-to-Markdown conversions are limited to 10 MB and 25 pages. Larger files require our robust backend tools. Email barry@schoedeldesign.ai with the subject 'Markflow Increased Access' to request expanded limits."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Which AI model does MarkFlow use?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "MarkFlow uses Google Gemini for document understanding and structure-aware conversion. Other formats use deterministic open-source converters."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Are my documents stored or used to train models?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "No. Files are processed for the duration of the conversion and discarded. MarkFlow does not train AI models on your documents and does not sell your data."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I use my own Gemini API key?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Sign in and add your Gemini API key in the profile menu. With your own key, requests bypass the MarkFlow backend entirely and go directly from your browser to Google."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Does MarkFlow work offline or as a Chrome extension?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "MarkFlow is built as a Progressive Web App and also has a Chrome extension build for in-browser conversions. AI-powered conversions require an internet connection to reach Google Gemini."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Where can I report a bug or request a feature?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Sign in and use the bug report button in the top-right corner, or email barry@schoedeldesign.ai directly."
+            }
+          }
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <header class="page-header">
+      <a href="/" class="brand">MarkFlow</a>
+      <nav>
+        <a href="/">Converter</a>
+        <a href="/about">About</a>
+        <a href="/faq" aria-current="page">FAQ</a>
+      </nav>
+    </header>
+
+    <main class="page">
+      <article class="prose">
+        <h1>Frequently Asked Questions</h1>
+        <p class="lead">
+          Quick answers to the things people ask most. Don't see your question?
+          Email <a href="mailto:barry@schoedeldesign.ai">barry@schoedeldesign.ai</a>.
+        </p>
+
+        <h2>What file types does MarkFlow support?</h2>
+        <p>
+          MarkFlow converts <strong>PDF</strong>, <strong>Microsoft Word (.docx)</strong>,
+          and <strong>HTML</strong> into Markdown, and renders Markdown back
+          into PDF, Word, or HTML. Plain text and rich-text inputs are also
+          supported.
+        </p>
+
+        <h2>Is MarkFlow free?</h2>
+        <p>
+          Yes. The public converter is free. If you bring your own Google
+          Gemini API key, requests go straight from your browser to Google and
+          there are no MarkFlow-side limits.
+        </p>
+
+        <h2>What are the size limits for public PDF conversion?</h2>
+        <p>
+          Public PDF-to-Markdown is limited to <strong>10 MB and 25 pages</strong>.
+          Larger files require our robust backend tools. For increased access,
+          email <a href="mailto:barry@schoedeldesign.ai?subject=Markflow%20Increased%20Access">barry@schoedeldesign.ai</a>
+          with the subject "Markflow Increased Access".
+        </p>
+
+        <h2>Which AI model does MarkFlow use?</h2>
+        <p>
+          MarkFlow uses <strong>Google Gemini</strong> for document
+          understanding and structure-aware conversion. Other formats use
+          deterministic open-source converters where AI isn't needed.
+        </p>
+
+        <h2>Are my documents stored or used to train models?</h2>
+        <p>
+          <strong>No.</strong> Files are processed for the duration of the
+          conversion and then discarded. MarkFlow does not train AI models on
+          your documents and does not sell your data.
+        </p>
+
+        <h2>Can I use my own Gemini API key?</h2>
+        <p>
+          Yes. Sign in and add your Gemini API key in the profile menu. With
+          your own key, requests bypass the MarkFlow backend entirely and go
+          directly from your browser to Google.
+        </p>
+
+        <h2>Does MarkFlow work offline or as a Chrome extension?</h2>
+        <p>
+          MarkFlow is built as a Progressive Web App and also has a Chrome
+          extension build for in-browser conversions. AI-powered conversions
+          require an internet connection to reach Google Gemini.
+        </p>
+
+        <h2>Where can I report a bug or request a feature?</h2>
+        <p>
+          Sign in and use the bug report button in the top-right corner, or
+          email <a href="mailto:barry@schoedeldesign.ai">barry@schoedeldesign.ai</a>
+          directly.
+        </p>
+
+        <p class="cta-row">
+          <a class="cta" href="/">Try the converter →</a>
+          <a class="cta cta-secondary" href="/about">About MarkFlow</a>
+        </p>
+      </article>
+    </main>
+
+    <footer class="page-footer">
+      <a href="https://schoedeldesign.ai" target="_blank" rel="noopener">Schoedel Design</a>
+      <span>·</span>
+      <a href="https://schoedeldesign.ai/blog" target="_blank" rel="noopener">Blog</a>
+      <span>·</span>
+      <a href="/about">About</a>
+      <span>·</span>
+      <a href="/faq">FAQ</a>
+      <span>·</span>
+      <span>&copy; 2026 Schoedel Design</span>
+    </footer>
+  </body>
+</html>
