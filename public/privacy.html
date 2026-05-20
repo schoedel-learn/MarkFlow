@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Privacy Policy — MarkFlow by Schoedel Design</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#0c0a09" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)" />
+    <meta
+      name="description"
+      content="MarkFlow's privacy policy: what we collect, where it lives, how long we keep it, and how to delete it."
+    />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://md.schoedeldesign.ai/privacy" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="MarkFlow" />
+    <meta property="og:title" content="MarkFlow Privacy Policy" />
+    <meta
+      property="og:description"
+      content="What MarkFlow collects, where it lives, how long we keep it, and how to delete it."
+    />
+    <meta property="og:url" content="https://md.schoedeldesign.ai/privacy" />
+    <meta property="og:image" content="https://md.schoedeldesign.ai/og-image.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="stylesheet" href="/static-pages.css" />
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('markflow-theme');
+          var mode = stored === 'light' || stored === 'dark' ? stored : null;
+          if (!mode) {
+            var prefersLight =
+              window.matchMedia &&
+              window.matchMedia('(prefers-color-scheme: light)').matches;
+            mode = prefersLight ? 'light' : 'dark';
+          }
+          document.documentElement.setAttribute('data-theme', mode);
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <header class="page-header">
+      <a href="/" class="brand">MarkFlow</a>
+      <nav>
+        <a href="/">Converter</a>
+        <a href="/about">About</a>
+        <a href="/faq">FAQ</a>
+        <a href="/privacy" aria-current="page">Privacy</a>
+        <a href="/terms">Terms</a>
+      </nav>
+    </header>
+
+    <main class="page">
+      <article class="prose">
+        <h1>Privacy Policy</h1>
+        <p class="lead">
+          MarkFlow is built on a simple promise: your documents are yours.
+          We don't sell your data, we don't train AI models on your files,
+          and we keep as little as we need for as short a time as we can.
+          This page tells you exactly what that means in practice.
+        </p>
+        <p><em>Last updated: May&nbsp;19,&nbsp;2026.</em></p>
+
+        <h2>The short version</h2>
+        <ul>
+          <li>If you're <strong>not signed in</strong>, your files never leave your browser except as part of a request to Google Gemini.</li>
+          <li>If you're <strong>signed in</strong>, we store a minimal profile (email, display name, photo URL) in Firebase Authentication and Firestore.</li>
+          <li>If you're an <strong>approved user</strong> running a large or scanned PDF through our managed pipeline, that PDF is uploaded to private Google Cloud Storage scoped to your account, processed, and queued for deletion.</li>
+          <li>We don't sell data, share it with advertisers, or use it to train models.</li>
+          <li>You can ask us to delete everything at any time — see <a href="#delete">Deleting your data</a>.</li>
+        </ul>
+
+        <h2>Who runs MarkFlow</h2>
+        <p>
+          MarkFlow is operated by <a href="https://schoedeldesign.ai" target="_blank" rel="noopener">Schoedel Design</a>,
+          an independent studio based in Texas, United States.
+          For any privacy question, email
+          <a href="mailto:barry@schoedeldesign.ai">barry@schoedeldesign.ai</a>.
+        </p>
+
+        <h2>What we collect, and where it lives</h2>
+
+        <h3>1. Documents and text you submit</h3>
+        <p>
+          The PDFs, Word files, HTML, and pasted text you feed to MarkFlow
+          are document content. Here is what happens to that content in
+          each mode:
+        </p>
+        <ul>
+          <li>
+            <strong>In-browser conversion (default for everyone).</strong>
+            Your file is read in your browser. If the conversion needs an
+            AI model, the text or page contents are sent to
+            <a href="https://ai.google.dev/" target="_blank" rel="noopener">Google Gemini</a>
+            over an HTTPS request from your browser. We do not store the
+            file on our servers in this mode.
+          </li>
+          <li>
+            <strong>Server-managed conversion (approved accounts only).</strong>
+            Large or scanned PDFs are uploaded to a private Google Cloud
+            Storage bucket at a path scoped to your user ID
+            (<code>pdf-inputs/&lt;your-uid&gt;/&lt;job-id&gt;/source.pdf</code>).
+            Our Cloud Run backend reads it, sends the page contents to
+            Google Gemini for OCR and formatting, writes the resulting
+            Markdown back to <code>markdown-outputs/&lt;your-uid&gt;/&lt;job-id&gt;/output.md</code>,
+            and returns it to your browser. Both objects are marked for
+            deletion after <strong>30 days</strong>. We are rolling out an
+            automated lifecycle policy and an in-app &ldquo;delete now&rdquo;
+            control so you can flush your inputs and outputs on demand.
+            Until that ships, you can request immediate deletion by emailing us
+            (see <a href="#delete">Deleting your data</a>).
+          </li>
+          <li>
+            <strong>Bring your own Gemini key.</strong>
+            If you add your own Google Gemini API key in the profile menu,
+            requests go directly from your browser to Google. Your key is
+            stored encrypted-at-rest in our Firestore (so it can also be
+            used by the server-managed pipeline when you choose) and,
+            optionally, in your browser's <code>localStorage</code> if you
+            check &ldquo;Remember key&rdquo;. We never log your key.
+          </li>
+        </ul>
+
+        <h3>2. Account information</h3>
+        <p>
+          If you sign in with Google, we store the following in Firebase
+          Authentication and a per-user Firestore record at
+          <code>users/&lt;your-uid&gt;</code>:
+        </p>
+        <ul>
+          <li>Your Firebase user ID.</li>
+          <li>Your email address.</li>
+          <li>Your display name and profile photo URL (as provided by your Google account).</li>
+          <li>The date you first signed in.</li>
+          <li>A running count of conversions you've performed today (for daily limits).</li>
+        </ul>
+
+        <h3>3. Job metadata</h3>
+        <p>
+          For each server-managed conversion we store a record in Firestore at
+          <code>conversion_jobs/&lt;job-id&gt;</code> containing the
+          original filename, file size, page count, your user ID and email,
+          the job status, and timestamps. These records are scheduled for
+          deletion 30 days after the job completes.
+        </p>
+
+        <h3>4. Usage counters</h3>
+        <ul>
+          <li>For approved users with monthly OCR allowances, we keep a per-month page counter at <code>ocr_usage/&lt;your-email&gt;_&lt;YYYYMM&gt;</code>.</li>
+          <li>We keep aggregate, non-identifying counts of logins and conversion requests at <code>stats/&lt;period&gt;</code> so we can see whether the service is being used. These do not link back to individual users.</li>
+        </ul>
+
+        <h3>5. Error logs</h3>
+        <p>
+          When something fails, we record the error message, stack trace,
+          the action that triggered it, your user ID and email, and any
+          relevant context (e.g.&nbsp;the filename) in Firestore at
+          <code>conversion_errors/&lt;error-id&gt;</code>. We use these to
+          fix bugs. Cloud Run may also record server-side errors
+          (including your email if the error is auth-related) in
+          Google Cloud Logging. These logs do <strong>not</strong> contain
+          your document content.
+        </p>
+
+        <h3>6. Things stored in your browser</h3>
+        <p>
+          MarkFlow uses your browser's storage for a small number of preferences,
+          not for cross-site tracking:
+        </p>
+        <ul>
+          <li><code>localStorage["markflow-theme"]</code> — your light/dark preference.</li>
+          <li><code>localStorage["gemini_api_key"]</code> — only if you opted in to &ldquo;Remember key&rdquo;.</li>
+          <li><code>sessionStorage["login_recorded"]</code> — a transient flag used so we don't double-count logins.</li>
+        </ul>
+        <p>
+          We do not use third-party analytics cookies, advertising trackers, or fingerprinting.
+        </p>
+
+        <h2>What we never do with your data</h2>
+        <ul>
+          <li>We don't sell it.</li>
+          <li>We don't share it with advertisers or data brokers.</li>
+          <li>We don't use it to train AI models — ours or anybody else's.</li>
+          <li>We don't read your documents. Backend processing is automated; humans only look at the contents of an upload if you specifically send it to us as part of a bug report.</li>
+        </ul>
+
+        <h2>Third parties we hand data to</h2>
+        <p>
+          Running MarkFlow requires us to pass certain data through third-party services. Those services have their own privacy practices:
+        </p>
+        <ul>
+          <li><strong>Google Gemini</strong> — receives the document content or page images that need to be converted. See <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener">Gemini API terms</a>.</li>
+          <li><strong>Firebase Authentication, Firestore, Cloud Storage, and Cloud Run</strong> (all Google Cloud) — host your account, job metadata, and (for approved-server jobs) your uploaded files. See <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">Firebase Privacy &amp; Security</a>.</li>
+        </ul>
+
+        <h2 id="delete">Deleting your data</h2>
+        <p>
+          You can ask us to delete any or all of your data at any time. Today, the available controls are:
+        </p>
+        <ul>
+          <li><strong>Sign out</strong> from the profile menu &mdash; this clears in-memory state and, if you didn't enable &ldquo;Remember key&rdquo;, your Gemini key as well.</li>
+          <li><strong>Remove your stored Gemini key</strong> via the profile menu's &ldquo;Remove server-side key&rdquo; control. This deletes the key from Firestore immediately.</li>
+          <li><strong>Request full account deletion</strong> by emailing <a href="mailto:barry@schoedeldesign.ai">barry@schoedeldesign.ai</a> from the address you signed up with, or using the bug-report button (top-right) with subject &ldquo;Delete my data.&rdquo; We will delete your Firebase account, your Firestore records, your stored Gemini key, your job history, and any uploaded PDFs or output Markdown within 30 days, and confirm by email.</li>
+        </ul>
+        <p>
+          A self-service &ldquo;Flush my data&rdquo; button is on the roadmap. When it ships you will be able to delete every uploaded file and conversion record yourself, without contacting us.
+        </p>
+
+        <h2>How long we keep things, in one table</h2>
+        <table>
+          <thead>
+            <tr><th>Data</th><th>Retention</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Uploaded PDFs (server-managed)</td><td>30 days, then deletion (rolling out automated enforcement)</td></tr>
+            <tr><td>Converted Markdown (server-managed)</td><td>30 days, then deletion</td></tr>
+            <tr><td>Job metadata</td><td>30 days</td></tr>
+            <tr><td>Account profile</td><td>Until you ask us to delete it</td></tr>
+            <tr><td>Stored Gemini API key</td><td>Until you remove it or delete your account</td></tr>
+            <tr><td>Error logs</td><td>Up to 90 days; older entries are purged on a rolling basis</td></tr>
+            <tr><td>Aggregate usage stats</td><td>Indefinite (no personal identifiers)</td></tr>
+          </tbody>
+        </table>
+
+        <h2>Children</h2>
+        <p>
+          MarkFlow is not directed at children under 13 and we do not knowingly collect personal information from them. If you believe a child has provided information to us, email us and we'll delete it.
+        </p>
+
+        <h2>Changes to this policy</h2>
+        <p>
+          If we materially change what we collect or how we use it, we'll update this page and note the change at the top. The current version is dated above.
+        </p>
+
+        <h2>Contact</h2>
+        <p>
+          Privacy questions, deletion requests, or anything else:
+          <a href="mailto:barry@schoedeldesign.ai">barry@schoedeldesign.ai</a>.
+        </p>
+
+        <p class="cta-row">
+          <a class="cta" href="/">Back to the converter</a>
+          <a class="cta cta-secondary" href="/terms">Read the Terms</a>
+        </p>
+      </article>
+    </main>
+
+    <footer class="page-footer">
+      <a href="https://schoedeldesign.ai" target="_blank" rel="noopener">Schoedel Design</a>
+      <span>·</span>
+      <a href="https://schoedeldesign.ai/blog" target="_blank" rel="noopener">Blog</a>
+      <span>·</span>
+      <a href="/about">About</a>
+      <span>·</span>
+      <a href="/faq">FAQ</a>
+      <span>·</span>
+      <a href="/privacy">Privacy</a>
+      <span>·</span>
+      <a href="/terms">Terms</a>
+      <span>·</span>
+      <span>&copy; 2026 Schoedel Design</span>
+    </footer>
+  </body>
+</html>
