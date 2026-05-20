@@ -2,6 +2,6 @@ fastapi==0.115.6
 uvicorn==0.34.0
 python-multipart==0.0.20
 pymupdf4llm==0.0.17
-google-genai==0.3.0
+google-genai>=0.8.0,<2.0
 pydantic==2.10.4
 firebase-admin==7.1.0

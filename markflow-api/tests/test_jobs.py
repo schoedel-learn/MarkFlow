@@ -78,6 +78,7 @@ class BackgroundJobRouteTests(unittest.TestCase):
             patch.object(main, 'verify_firebase_id_token', return_value={'uid': 'u1', 'email': 'approved@example.com', 'email_verified': True}),
             patch.object(main, 'is_approved_user', return_value=True),
             patch.object(main, 'count_pdf_pages', return_value=9),
+            patch.object(main, 'analyze_pdf_pages', return_value=[]),
             patch.object(main, 'upload_bytes_to_storage') as upload_mock,
             patch.object(main, 'process_pdf_job') as process_mock,
             patch.object(main, 'create_conversion_job', return_value={'jobId': 'job123', 'status': 'queued', 'storageInputPath': 'pdf-inputs/u1/job123/source.pdf'}) as create_mock,
@@ -131,9 +132,14 @@ class BackgroundJobRouteTests(unittest.TestCase):
                 'originalFilename': 'sample.pdf',
             }),
             patch.object(main, 'download_bytes_from_storage', return_value=b'%PDF-1.4 sample'),
-            patch.object(main, 'improve_pdf_markdown', return_value='# converted'),
+            patch.object(
+                main,
+                'improve_pdf_markdown',
+                return_value={'markdown': '# converted', 'ocr_pages_used': 0, 'text_pages_processed': 1},
+            ),
             patch.object(main, 'upload_text_to_storage') as upload_mock,
             patch.object(main, 'update_conversion_job') as update_mock,
+            patch.object(main, 'record_ocr_usage') as record_usage_mock,
             patch.object(
                 main,
                 'get_settings',
@@ -151,8 +157,10 @@ class BackgroundJobRouteTests(unittest.TestCase):
             'status': 'completed',
             'storageOutputPath': 'markdown-outputs/u1/job123/output.md',
             'flavor': 'CommonMark',
+            'ocrPagesUsed': 0,
         }))
         upload_mock.assert_called_once_with('markdown-outputs/u1/job123/output.md', '# converted')
+        record_usage_mock.assert_not_called()
 
 
 if __name__ == '__main__':

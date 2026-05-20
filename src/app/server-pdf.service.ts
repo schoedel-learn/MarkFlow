@@ -54,7 +54,12 @@ export class ServerPdfService {
       const detail = typeof data === 'object' && data !== null && 'detail' in data
         ? (data as ErrorResponse).detail
         : undefined;
-      throw new Error(detail || fallbackMessage);
+      const cleanDetail = typeof detail === 'string'
+        ? detail
+            .replace(/^scanned_pdf_requires_approval:\s*/, '')
+            .replace(/^ocr_quota_exceeded:\s*/, '')
+        : undefined;
+      throw new Error(cleanDetail || fallbackMessage);
     }
 
     return data as T;

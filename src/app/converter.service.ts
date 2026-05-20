@@ -805,7 +805,11 @@ ${text}`,
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || `Server error: ${response.status}`);
+        const rawDetail = typeof errorData?.detail === 'string' ? errorData.detail : '';
+        if (rawDetail.startsWith('scanned_pdf_requires_approval:')) {
+          throw new Error(rawDetail.replace(/^scanned_pdf_requires_approval:\s*/, ''));
+        }
+        throw new Error(rawDetail || `Server error: ${response.status}`);
       }
 
       const data = await response.json();

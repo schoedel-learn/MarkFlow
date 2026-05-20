@@ -5,10 +5,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from firebase_admin import auth as firebase_auth
 
-from entitlements import is_approved_user
+from entitlements import (
+    check_ocr_budget,
+    is_approved_user,
+    record_ocr_usage,
+)
 from firebase_admin_client import get_firebase_app
 from job_store import build_storage_paths, create_conversion_job, get_conversion_job, update_conversion_job
-from pdf_pipeline import count_pdf_pages, improve_pdf_markdown
+from pdf_pipeline import (
+    analyze_pdf_pages,
+    count_pdf_pages,
+    improve_pdf_markdown,
+)
 from settings import get_settings
 from storage_service import download_bytes_from_storage, download_text_from_storage, upload_bytes_to_storage, upload_text_to_storage
 from user_keys import delete_user_gemini_key, get_user_gemini_key, get_user_gemini_key_status, set_user_gemini_key
@@ -115,6 +123,28 @@ def _resolve_flavor_name(flavor: str) -> str:
     return flavor if flavor != "auto" else "GitHub Flavored Markdown"
 
 
+# Standardized error payloads for OCR gating so the frontend can recognize and
+# surface a clean upgrade prompt instead of a generic "conversion failed".
+OCR_REQUIRED_DETAIL = (
+    "scanned_pdf_requires_approval: This PDF appears to be scanned or "
+    "image-based. OCR access is currently limited to approved users — email "
+    "barry@schoedeldesign.ai with the subject 'Markflow Increased Access' "
+    "to request access."
+)
+
+
+def _ocr_quota_exceeded_detail(quota: int, used: int, needed: int) -> str:
+    return (
+        f"ocr_quota_exceeded: This PDF needs {needed} OCR page(s) but you "
+        f"have only {max(quota - used, 0)} of {quota} remaining this month. "
+        "Email barry@schoedeldesign.ai for a higher limit."
+    )
+
+
+def _count_pages_needing_ocr(temp_path: str) -> int:
+    return sum(1 for analysis in analyze_pdf_pages(temp_path) if analysis.needs_ocr)
+
+
 def _convert_pdf_file(
     temp_path: str,
     *,
@@ -122,15 +152,20 @@ def _convert_pdf_file(
     model: str,
     chunk_size: int,
     flavor: str,
-) -> dict[str, str]:
-    final_md = improve_pdf_markdown(
+    ocr_enabled: bool = False,
+) -> dict[str, str | int]:
+    result = improve_pdf_markdown(
         pdf_path=temp_path,
         api_key=api_key,
         model=model,
         chunk_size=chunk_size,
         flavor_name=_resolve_flavor_name(flavor),
+        ocr_enabled=ocr_enabled,
     )
-    return {"markdown": final_md}
+    return {
+        "markdown": result["markdown"],
+        "ocrPagesUsed": result.get("ocr_pages_used", 0),
+    }
 
 
 def _ensure_owner_job(job_id: str, user_id: str) -> dict:
@@ -171,18 +206,26 @@ def process_pdf_job(job_id: str, flavor: str) -> None:
         output_path = build_storage_paths(job['userId'], job_id)[1]
         content = download_bytes_from_storage(input_path)
         temp_path = _save_pdf_bytes_to_temp_file(content)
-        markdown = improve_pdf_markdown(
+        result = improve_pdf_markdown(
             pdf_path=temp_path,
             api_key=effective_key,
             model=settings.gemini_model,
             chunk_size=settings.pdf_chunk_size,
             flavor_name=_resolve_flavor_name(flavor),
+            ocr_enabled=True,
         )
-        upload_text_to_storage(output_path, markdown)
+        ocr_pages_used = int(result.get('ocr_pages_used', 0))
+        if ocr_pages_used > 0:
+            try:
+                record_ocr_usage(job.get('userEmail') or '', ocr_pages_used)
+            except Exception as usage_exc:  # pragma: no cover - log only
+                print(f"[ocr] failed to record usage for job {job_id}: {usage_exc}")
+        upload_text_to_storage(output_path, result['markdown'])
         update_conversion_job(job_id, {
             'status': 'completed',
             'storageOutputPath': output_path,
             'flavor': flavor,
+            'ocrPagesUsed': ocr_pages_used,
         })
     except Exception as exc:
         update_conversion_job(job_id, {
@@ -206,12 +249,15 @@ async def convert_pdf(
     temp_path = ""
     try:
         temp_path = await _save_upload_to_temp_pdf(file)
+        if _count_pages_needing_ocr(temp_path) > 0:
+            raise HTTPException(status_code=409, detail=OCR_REQUIRED_DETAIL)
         return _convert_pdf_file(
             temp_path,
             api_key=api_key,
             model="gemini-3.1-pro-preview",
             chunk_size=3,
             flavor=flavor,
+            ocr_enabled=False,
         )
     except HTTPException:
         raise
@@ -246,13 +292,29 @@ async def convert_pdf_approved_sync(
     temp_path = ""
     try:
         temp_path = await _save_upload_to_temp_pdf(file)
-        return _convert_pdf_file(
+        ocr_pages_needed = _count_pages_needing_ocr(temp_path)
+        if ocr_pages_needed > 0:
+            allowed, quota, used = check_ocr_budget(verified_email, ocr_pages_needed)
+            if not allowed:
+                raise HTTPException(
+                    status_code=429,
+                    detail=_ocr_quota_exceeded_detail(quota, used, ocr_pages_needed),
+                )
+        result = _convert_pdf_file(
             temp_path,
             api_key=effective_key,
             model=settings.gemini_model,
             chunk_size=settings.pdf_chunk_size,
             flavor=flavor,
+            ocr_enabled=True,
         )
+        ocr_pages_used = int(result.get('ocrPagesUsed', 0) or 0)
+        if ocr_pages_used > 0:
+            try:
+                record_ocr_usage(verified_email, ocr_pages_used)
+            except Exception as usage_exc:  # pragma: no cover - log only
+                print(f"[ocr] failed to record usage for {verified_email}: {usage_exc}")
+        return result
     except HTTPException:
         raise
     except Exception as e:
@@ -278,6 +340,23 @@ async def create_pdf_job(
 
     content = await _read_upload_bytes(file)
     page_count = _count_pdf_pages_from_bytes(content)
+
+    # Pre-scan for OCR pages so we can reject over-budget jobs before
+    # consuming a Cloud Run worker slot.
+    temp_path = _save_pdf_bytes_to_temp_file(content)
+    try:
+        ocr_pages_needed = _count_pages_needing_ocr(temp_path)
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+    if ocr_pages_needed > 0:
+        allowed, quota, used = check_ocr_budget(identity['email'], ocr_pages_needed)
+        if not allowed:
+            raise HTTPException(
+                status_code=429,
+                detail=_ocr_quota_exceeded_detail(quota, used, ocr_pages_needed),
+            )
+
     job = create_conversion_job(
         user_id=identity['uid'],
         user_email=identity['email'],
