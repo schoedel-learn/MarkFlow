@@ -179,6 +179,41 @@
                 </div>
               }
 
+              <div class="px-4 py-4 border-b border-stone-100">
+                <div class="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-2">
+                  Your data
+                </div>
+                <p class="text-[11px] text-stone-500 mb-3 leading-relaxed">
+                  Flush removes your stored PDFs and converted markdown from MarkFlow. Delete also removes your account, profile, and any saved keys.
+                </p>
+                <div class="flex flex-col gap-2">
+                  <button
+                    type="button"
+                    (click)="flushConversionHistory()"
+                    [disabled]="!!dataActionBusy()"
+                    class="w-full px-3 py-2 text-xs font-medium rounded-md border border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100 disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-left flex items-center gap-2"
+                  >
+                    <mat-icon class="text-sm scale-75 text-amber-700">delete_sweep</mat-icon>
+                    {{ dataActionBusy() === 'flush' ? 'Flushing…' : 'Flush conversion history' }}
+                  </button>
+                  <button
+                    type="button"
+                    (click)="deleteMyAccount()"
+                    [disabled]="!!dataActionBusy()"
+                    class="w-full px-3 py-2 text-xs font-medium rounded-md border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-left flex items-center gap-2"
+                  >
+                    <mat-icon class="text-sm scale-75 text-red-600">person_remove</mat-icon>
+                    {{ dataActionBusy() === 'delete' ? 'Deleting…' : 'Delete my account and data' }}
+                  </button>
+                </div>
+                @if (dataActionMessage()) {
+                  <div class="mt-2 text-[11px] text-emerald-700">{{ dataActionMessage() }}</div>
+                }
+                @if (dataActionError()) {
+                  <div class="mt-2 text-[11px] text-red-600">{{ dataActionError() }}</div>
+                }
+              </div>
+
               <div class="py-2">
                 <button 
                   (click)="state.logout()" 
@@ -578,6 +613,31 @@
 
   <!-- Footer -->
   <footer class="mt-12 text-stone-400 text-xs flex flex-col items-center gap-3">
+    <section class="w-full max-w-2xl rounded-xl border border-stone-200 bg-stone-50 px-5 py-4 text-center">
+      <p class="font-sans text-sm font-semibold text-stone-700">
+        Built by Schoedel Design
+      </p>
+      <p class="font-sans mt-1 leading-relaxed text-stone-500">
+        MarkFlow turns PDFs, Word, and HTML into clean, structured Markdown with AI — tables, headings, and formatting preserved. Organizations use it for document pipelines that don&rsquo;t need retyping.
+      </p>
+      <a
+        href="https://schoedeldesign.ai/#contact"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="font-sans mt-3 inline-flex rounded-lg bg-stone-800 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-700 transition-colors"
+      >
+        Need document workflows like this? Talk to us
+      </a>
+      <p class="font-sans mt-3 text-stone-400">
+        Also from Schoedel Design:
+        <a href="https://proset.ai" target="_blank" rel="noopener noreferrer" class="hover:text-stone-600 transition-colors">Proset AI</a> ·
+        <a href="https://art.schoedeldesign.ai" target="_blank" rel="noopener noreferrer" class="hover:text-stone-600 transition-colors">Vector AI</a> ·
+        <a href="https://hosty.schoedeldesign.ai" target="_blank" rel="noopener noreferrer" class="hover:text-stone-600 transition-colors">Hosty</a> ·
+        <a href="https://ui.schoedeldesign.ai" target="_blank" rel="noopener noreferrer" class="hover:text-stone-600 transition-colors">Open WebUI</a> ·
+        <a href="https://n8n.schoedeldesign.ai" target="_blank" rel="noopener noreferrer" class="hover:text-stone-600 transition-colors">n8n</a> ·
+        <a href="https://linux.schoedeldesign.ai" target="_blank" rel="noopener noreferrer" class="hover:text-stone-600 transition-colors">Linux Glossary</a>
+      </p>
+    </section>
     <nav class="font-sans flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
       <a href="/about" class="hover:text-stone-600 transition-colors">About</a>
       <span aria-hidden="true">·</span>
