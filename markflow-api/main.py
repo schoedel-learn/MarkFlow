@@ -10,7 +10,7 @@ from entitlements import (
     is_approved_user,
     record_ocr_usage,
 )
-from firebase_admin_client import get_firebase_app
+from firebase_admin_client import get_auth_client, get_firebase_app, get_firestore_client
 from job_store import build_storage_paths, create_conversion_job, get_conversion_job, update_conversion_job
 from pdf_pipeline import (
     analyze_pdf_pages,
@@ -18,7 +18,13 @@ from pdf_pipeline import (
     improve_pdf_markdown,
 )
 from settings import get_settings
-from storage_service import download_bytes_from_storage, download_text_from_storage, upload_bytes_to_storage, upload_text_to_storage
+from storage_service import (
+    delete_blobs_by_prefix,
+    download_bytes_from_storage,
+    download_text_from_storage,
+    upload_bytes_to_storage,
+    upload_text_to_storage,
+)
 from user_keys import delete_user_gemini_key, get_user_gemini_key, get_user_gemini_key_status, set_user_gemini_key
 
 app = FastAPI(title="MarkFlow API", version="1.0.0")
@@ -432,6 +438,123 @@ async def delete_my_gemini_key(authorization: str | None = Header(default=None))
     identity = _require_approved_identity(authorization)
     delete_user_gemini_key(identity['uid'])
     return {'hasKey': False, 'updatedAt': None}
+
+
+def _delete_user_conversion_jobs(uid: str, firestore_client=None) -> int:
+    """Delete every conversion_jobs doc owned by ``uid`` along with the
+    GCS input/output blobs each one references. Returns the number of
+    Firestore docs deleted."""
+    client = firestore_client or get_firestore_client()
+    query = client.collection('conversion_jobs').where('userId', '==', uid)
+    deleted = 0
+    for snapshot in query.stream():
+        data = snapshot.to_dict() or {}
+        for path_key in ('storageInputPath', 'storageOutputPath'):
+            storage_path = data.get(path_key)
+            if not storage_path:
+                continue
+            try:
+                delete_blobs_by_prefix(storage_path)
+            except Exception as exc:  # pragma: no cover - best-effort cleanup
+                print(f"[delete-data] failed to delete blob {storage_path}: {exc}")
+        snapshot.reference.delete()
+        deleted += 1
+    return deleted
+
+
+def _purge_user_storage(uid: str) -> None:
+    """Belt-and-suspenders sweep of the per-user storage prefixes in case a
+    Firestore job doc was missing or already gone."""
+    for prefix in (f'pdf-inputs/{uid}/', f'markdown-outputs/{uid}/'):
+        try:
+            delete_blobs_by_prefix(prefix)
+        except Exception as exc:  # pragma: no cover - best-effort cleanup
+            print(f"[delete-data] failed to purge prefix {prefix}: {exc}")
+
+
+def _delete_user_collection_docs(
+    *,
+    collection: str,
+    field: str,
+    value: str,
+    firestore_client=None,
+) -> int:
+    if not value:
+        return 0
+    client = firestore_client or get_firestore_client()
+    query = client.collection(collection).where(field, '==', value)
+    deleted = 0
+    for snapshot in query.stream():
+        snapshot.reference.delete()
+        deleted += 1
+    return deleted
+
+
+@app.delete('/api/me/conversions')
+@app.delete('/me/conversions')
+async def flush_my_conversions(authorization: str | None = Header(default=None)):
+    """Self-service flush: removes all conversion jobs (Firestore + GCS) for
+    the authenticated user. The account itself is preserved."""
+    identity = _get_verified_user_identity(authorization)
+    uid = identity['uid']
+    deleted_jobs = _delete_user_conversion_jobs(uid)
+    _purge_user_storage(uid)
+    return {'deletedJobs': deleted_jobs}
+
+
+@app.delete('/api/me')
+@app.delete('/me')
+async def delete_my_account(authorization: str | None = Header(default=None)):
+    """Self-service account deletion: cascades across Firestore (jobs,
+    errors, ocr usage, gemini keys, user profile), GCS (per-user storage
+    prefixes), and Firebase Auth (the auth identity itself)."""
+    identity = _get_verified_user_identity(authorization)
+    uid = identity['uid']
+    email = identity.get('email') or ''
+    canonical_email = email.strip().lower() if isinstance(email, str) else ''
+
+    deleted_jobs = _delete_user_conversion_jobs(uid)
+    _purge_user_storage(uid)
+
+    client = get_firestore_client()
+    deleted_errors = _delete_user_collection_docs(
+        collection='conversion_errors',
+        field='userId',
+        value=uid,
+        firestore_client=client,
+    )
+    deleted_ocr = _delete_user_collection_docs(
+        collection='ocr_usage',
+        field='email',
+        value=canonical_email,
+        firestore_client=client,
+    )
+
+    try:
+        delete_user_gemini_key(uid, firestore_client=client)
+    except Exception as exc:  # pragma: no cover - best-effort cleanup
+        print(f"[delete-data] failed to delete gemini key for {uid}: {exc}")
+
+    try:
+        client.collection('users').document(uid).delete()
+    except Exception as exc:  # pragma: no cover - best-effort cleanup
+        print(f"[delete-data] failed to delete user profile for {uid}: {exc}")
+
+    auth_deleted = False
+    try:
+        get_auth_client().delete_user(uid)
+        auth_deleted = True
+    except Exception as exc:
+        # firebase_admin raises if the auth record was already gone; that's
+        # still a success from the user's POV.
+        print(f"[delete-data] auth.delete_user failed for {uid}: {exc}")
+
+    return {
+        'deletedJobs': deleted_jobs,
+        'deletedErrors': deleted_errors,
+        'deletedOcrUsage': deleted_ocr,
+        'authDeleted': auth_deleted,
+    }
 
 
 if __name__ == "__main__":

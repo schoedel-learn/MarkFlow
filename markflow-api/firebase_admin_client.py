@@ -1,7 +1,7 @@
 from functools import lru_cache
 
 import firebase_admin
-from firebase_admin import firestore, storage
+from firebase_admin import auth, firestore, storage
 
 from settings import get_settings
 
@@ -34,3 +34,9 @@ def get_storage_bucket():
     if settings.storage_bucket:
         return storage.bucket(settings.storage_bucket, app=app)
     return storage.bucket(app=app)
+
+
+def get_auth_client():
+    """Return the Firebase Auth admin module, ensuring the app is initialized."""
+    get_firebase_app()
+    return auth

@@ -37,3 +37,21 @@ def download_bytes_from_storage(storage_path: str, *, bucket=None) -> bytes:
 
 def download_text_from_storage(storage_path: str, *, bucket=None) -> str:
     return download_bytes_from_storage(storage_path, bucket=bucket).decode('utf-8')
+
+
+def delete_blobs_by_prefix(prefix: str, *, bucket=None) -> int:
+    """Delete every blob under ``prefix`` and return how many were removed.
+
+    Used by the self-service “flush” and “delete account” endpoints to wipe
+    user-scoped storage paths (e.g. ``pdf-inputs/<uid>/`` and
+    ``markdown-outputs/<uid>/``). Refuses to operate on an empty prefix so
+    a bug can never trigger a bucket-wide deletion.
+    """
+    if not prefix:
+        raise ValueError("prefix is required")
+    storage_bucket = bucket or get_storage_bucket()
+    deleted = 0
+    for blob in storage_bucket.list_blobs(prefix=prefix):
+        blob.delete()
+        deleted += 1
+    return deleted

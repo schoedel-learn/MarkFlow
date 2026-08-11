@@ -111,12 +111,10 @@
             Our Cloud Run backend reads it, sends the page contents to
             Google Gemini for OCR and formatting, writes the resulting
             Markdown back to <code>markdown-outputs/&lt;your-uid&gt;/&lt;job-id&gt;/output.md</code>,
-            and returns it to your browser. Both objects are marked for
-            deletion after <strong>30 days</strong>. We are rolling out an
-            automated lifecycle policy and an in-app &ldquo;delete now&rdquo;
-            control so you can flush your inputs and outputs on demand.
-            Until that ships, you can request immediate deletion by emailing us
-            (see <a href="#delete">Deleting your data</a>).
+            and returns it to your browser. Both objects are automatically
+            deleted by a Cloud Storage lifecycle policy <strong>30 days</strong>
+            after upload, and you can flush them sooner from the profile
+            menu (see <a href="#delete">Deleting your data</a>).
           </li>
           <li>
             <strong>Bring your own Gemini key.</strong>
@@ -208,11 +206,10 @@
         <ul>
           <li><strong>Sign out</strong> from the profile menu &mdash; this clears in-memory state and, if you didn't enable &ldquo;Remember key&rdquo;, your Gemini key as well.</li>
           <li><strong>Remove your stored Gemini key</strong> via the profile menu's &ldquo;Remove server-side key&rdquo; control. This deletes the key from Firestore immediately.</li>
-          <li><strong>Request full account deletion</strong> by emailing <a href="mailto:barry@schoedeldesign.ai">barry@schoedeldesign.ai</a> from the address you signed up with, or using the bug-report button (top-right) with subject &ldquo;Delete my data.&rdquo; We will delete your Firebase account, your Firestore records, your stored Gemini key, your job history, and any uploaded PDFs or output Markdown within 30 days, and confirm by email.</li>
+          <li><strong>Flush your conversion history</strong> from the profile menu's &ldquo;Flush conversion history&rdquo; button. This removes all of your stored PDFs, converted Markdown, and job records from MarkFlow immediately. Your account stays intact.</li>
+          <li><strong>Delete your account and data</strong> from the profile menu's &ldquo;Delete my account and data&rdquo; button. This removes your Firebase account, your Firestore records, your stored Gemini key, your job history, your OCR usage counters, and any uploaded PDFs or output Markdown in one shot. The action requires you to type <code>DELETE</code> to confirm and cannot be undone.</li>
+          <li><strong>Need help instead?</strong> Email <a href="mailto:barry@schoedeldesign.ai">barry@schoedeldesign.ai</a> from the address you signed up with, or use the bug-report button (top-right) with subject &ldquo;Delete my data.&rdquo;</li>
         </ul>
-        <p>
-          A self-service &ldquo;Flush my data&rdquo; button is on the roadmap. When it ships you will be able to delete every uploaded file and conversion record yourself, without contacting us.
-        </p>
 
         <h2>How long we keep things, in one table</h2>
         <table>
@@ -220,12 +217,12 @@
             <tr><th>Data</th><th>Retention</th></tr>
           </thead>
           <tbody>
-            <tr><td>Uploaded PDFs (server-managed)</td><td>30 days, then deletion (rolling out automated enforcement)</td></tr>
-            <tr><td>Converted Markdown (server-managed)</td><td>30 days, then deletion</td></tr>
-            <tr><td>Job metadata</td><td>30 days</td></tr>
+            <tr><td>Uploaded PDFs (server-managed)</td><td>30 days (auto-deleted by Cloud Storage lifecycle), or sooner via &ldquo;Flush conversion history&rdquo;</td></tr>
+            <tr><td>Converted Markdown (server-managed)</td><td>30 days (auto-deleted by Cloud Storage lifecycle), or sooner via &ldquo;Flush conversion history&rdquo;</td></tr>
+            <tr><td>Job metadata</td><td>30 days (auto-deleted by Firestore TTL)</td></tr>
             <tr><td>Account profile</td><td>Until you ask us to delete it</td></tr>
             <tr><td>Stored Gemini API key</td><td>Until you remove it or delete your account</td></tr>
-            <tr><td>Error logs</td><td>Up to 90 days; older entries are purged on a rolling basis</td></tr>
+            <tr><td>Error logs</td><td>Up to 90 days; auto-deleted by Firestore TTL</td></tr>
             <tr><td>Aggregate usage stats</td><td>Indefinite (no personal identifiers)</td></tr>
           </tbody>
         </table>

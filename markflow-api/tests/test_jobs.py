@@ -42,7 +42,8 @@ class JobStoreTests(unittest.TestCase):
         self.assertIn('expiresAt', record)
 
         created_at = datetime.fromisoformat(record['createdAt'])
-        expires_at = datetime.fromisoformat(record['expiresAt'])
+        expires_at = record['expiresAt']
+        self.assertIsInstance(expires_at, datetime)
         self.assertGreater(expires_at, created_at)
 
 

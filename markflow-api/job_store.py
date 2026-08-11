@@ -40,7 +40,9 @@ def create_job_record(
         'storageInputPath': storage_input_path,
         'createdAt': now.isoformat(),
         'updatedAt': now.isoformat(),
-        'expiresAt': (now + timedelta(days=30)).isoformat(),
+        # Native datetime is serialized as a Firestore Timestamp, which is
+        # required by the Firestore TTL policy on `conversion_jobs.expiresAt`.
+        'expiresAt': now + timedelta(days=30),
     }
 
 

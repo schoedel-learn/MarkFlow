@@ -211,5 +211,84 @@ class OcrGatingTests(unittest.TestCase):
         record_usage_mock.assert_called_once_with("approved@example.com", 1)
 
 
+class SelfServiceDataRouteTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.client = TestClient(main.app)
+
+    def _verified(self, **overrides):
+        token = {
+            "uid": "uid-42",
+            "email": "user@example.com",
+            "email_verified": True,
+        }
+        token.update(overrides)
+        return token
+
+    def test_flush_conversions_requires_auth(self) -> None:
+        response = self.client.delete("/api/me/conversions")
+        self.assertEqual(response.status_code, 401)
+
+    def test_flush_conversions_deletes_jobs_and_purges_prefixes(self) -> None:
+        with (
+            patch.object(main, "verify_firebase_id_token", return_value=self._verified()),
+            patch.object(main, "_delete_user_conversion_jobs", return_value=3) as jobs_mock,
+            patch.object(main, "_purge_user_storage") as purge_mock,
+        ):
+            response = self.client.delete(
+                "/api/me/conversions",
+                headers={"Authorization": "Bearer valid-token"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"deletedJobs": 3})
+        jobs_mock.assert_called_once_with("uid-42")
+        purge_mock.assert_called_once_with("uid-42")
+
+    def test_delete_account_requires_auth(self) -> None:
+        response = self.client.delete("/api/me")
+        self.assertEqual(response.status_code, 401)
+
+    def test_delete_account_cascades_everything(self) -> None:
+        fake_client = SimpleNamespace(
+            collection=lambda name: SimpleNamespace(
+                document=lambda uid: SimpleNamespace(delete=lambda: None)
+            )
+        )
+        with (
+            patch.object(main, "verify_firebase_id_token", return_value=self._verified()),
+            patch.object(main, "_delete_user_conversion_jobs", return_value=2) as jobs_mock,
+            patch.object(main, "_purge_user_storage") as purge_mock,
+            patch.object(main, "get_firestore_client", return_value=fake_client),
+            patch.object(main, "_delete_user_collection_docs", side_effect=[5, 1]) as docs_mock,
+            patch.object(main, "delete_user_gemini_key") as gemini_mock,
+            patch.object(main, "get_auth_client") as auth_mock,
+        ):
+            auth_mock.return_value.delete_user = lambda uid: None
+            response = self.client.delete(
+                "/api/me",
+                headers={"Authorization": "Bearer valid-token"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["deletedJobs"], 2)
+        self.assertEqual(body["deletedErrors"], 5)
+        self.assertEqual(body["deletedOcrUsage"], 1)
+        self.assertTrue(body["authDeleted"])
+
+        jobs_mock.assert_called_once_with("uid-42")
+        purge_mock.assert_called_once_with("uid-42")
+        gemini_mock.assert_called_once_with("uid-42", firestore_client=fake_client)
+
+        # Confirm both per-user collection sweeps used the right keys.
+        call_kwargs = [c.kwargs for c in docs_mock.call_args_list]
+        self.assertEqual(call_kwargs[0]["collection"], "conversion_errors")
+        self.assertEqual(call_kwargs[0]["field"], "userId")
+        self.assertEqual(call_kwargs[0]["value"], "uid-42")
+        self.assertEqual(call_kwargs[1]["collection"], "ocr_usage")
+        self.assertEqual(call_kwargs[1]["field"], "email")
+        self.assertEqual(call_kwargs[1]["value"], "user@example.com")
+
+
 if __name__ == "__main__":
     unittest.main()

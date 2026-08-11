@@ -271,4 +271,56 @@ export class WebLayoutComponent {
   get showApprovedPdfJobNotice() {
     return this.state.mode() === 'doc-to-md' && !!this.state.approvedPdfJob();
   }
+
+  // Self-service data controls
+  dataActionBusy = signal<'flush' | 'delete' | null>(null);
+  dataActionMessage = signal<string | null>(null);
+  dataActionError = signal<string | null>(null);
+
+  async flushConversionHistory() {
+    if (this.dataActionBusy()) return;
+    const ok = typeof window !== 'undefined'
+      ? window.confirm('Delete all of your stored PDF uploads and converted markdown from MarkFlow? This cannot be undone.')
+      : false;
+    if (!ok) return;
+    this.dataActionBusy.set('flush');
+    this.dataActionError.set(null);
+    this.dataActionMessage.set(null);
+    try {
+      const { deletedJobs } = await this.state.flushMyConversionHistory();
+      this.dataActionMessage.set(
+        deletedJobs > 0
+          ? `Removed ${deletedJobs} conversion${deletedJobs === 1 ? '' : 's'} from MarkFlow.`
+          : 'Nothing to flush — your conversion history was already empty.',
+      );
+    } catch (e) {
+      this.dataActionError.set(e instanceof Error ? e.message : 'Failed to flush conversion history.');
+    } finally {
+      this.dataActionBusy.set(null);
+    }
+  }
+
+  async deleteMyAccount() {
+    if (this.dataActionBusy()) return;
+    if (typeof window === 'undefined') return;
+    const first = window.confirm(
+      'Delete your MarkFlow account? This permanently removes your profile, conversion history, stored PDFs, and Gemini API key. This cannot be undone.',
+    );
+    if (!first) return;
+    const typed = window.prompt('To confirm, type DELETE in all caps.');
+    if (typed !== 'DELETE') {
+      this.dataActionError.set('Account deletion cancelled.');
+      return;
+    }
+    this.dataActionBusy.set('delete');
+    this.dataActionError.set(null);
+    this.dataActionMessage.set(null);
+    try {
+      await this.state.deleteMyAccount();
+      this.closeProfileMenu();
+    } catch (e) {
+      this.dataActionError.set(e instanceof Error ? e.message : 'Failed to delete account.');
+      this.dataActionBusy.set(null);
+    }
+  }
 }

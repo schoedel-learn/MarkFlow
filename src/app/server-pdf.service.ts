@@ -176,4 +176,33 @@ export class ServerPdfService {
     });
     return this.parseResponse<BackendKeyStatus>(response, 'Failed to clear backend API key.');
   }
+
+  async flushMyConversions(): Promise<{ deletedJobs: number }> {
+    const response = await fetch(`${this.apiBaseUrl}/me/conversions`, {
+      method: 'DELETE',
+      headers: await this.getAuthorizedHeaders(),
+    });
+    return this.parseResponse<{ deletedJobs: number }>(
+      response,
+      'Failed to flush your conversion history.',
+    );
+  }
+
+  async deleteMyAccount(): Promise<{
+    deletedJobs: number;
+    deletedErrors: number;
+    deletedOcrUsage: number;
+    authDeleted: boolean;
+  }> {
+    const response = await fetch(`${this.apiBaseUrl}/me`, {
+      method: 'DELETE',
+      headers: await this.getAuthorizedHeaders(),
+    });
+    return this.parseResponse<{
+      deletedJobs: number;
+      deletedErrors: number;
+      deletedOcrUsage: number;
+      authDeleted: boolean;
+    }>(response, 'Failed to delete your account.');
+  }
 }

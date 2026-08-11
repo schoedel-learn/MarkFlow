@@ -3,7 +3,7 @@ import { isPlatformBrowser } from '@angular/common';
 import { ConverterService, MarkdownFlavor } from './converter.service';
 import { auth, signInWithGoogle, logOut, db } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, setDoc, getDoc, collection, addDoc, writeBatch, increment } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, addDoc, writeBatch, increment, Timestamp } from 'firebase/firestore';
 import { EntitlementMode, EntitlementService } from './entitlement.service';
 import {
   APPROVED_PDF_SYNC_MAX_BYTES,
@@ -345,6 +345,9 @@ export class CoreStateService {
         errorMessage: error instanceof Error ? error.message : String(error),
         errorStack: error instanceof Error ? error.stack : null,
         timestamp: new Date().toISOString(),
+        // Firestore TTL purges errors ~90 days after the failure. Long enough
+        // to debug a recurring bug, short enough to honor the privacy promise.
+        expiresAt: Timestamp.fromMillis(Date.now() + 90 * 24 * 60 * 60 * 1000),
         userId: this.user()?.uid || 'anonymous',
         userEmail: this.user()?.email || 'anonymous',
         ...additionalData
@@ -352,6 +355,34 @@ export class CoreStateService {
       await addDoc(collection(db, 'conversion_errors'), errorData);
     } catch (e) {
       console.error('Failed to log error to Firestore', e);
+    }
+  }
+
+  async flushMyConversionHistory(): Promise<{ deletedJobs: number }> {
+    if (!this.user()) {
+      throw new Error('You must be signed in.');
+    }
+    const result = await this.serverPdfService.flushMyConversions();
+    this.approvedPdfJob.set(null);
+    return result;
+  }
+
+  async deleteMyAccount(): Promise<void> {
+    if (!this.user()) {
+      throw new Error('You must be signed in.');
+    }
+    await this.serverPdfService.deleteMyAccount();
+    if (isPlatformBrowser(this.platformId)) {
+      try { localStorage.removeItem('gemini_api_key'); } catch {}
+      try { sessionStorage.clear(); } catch {}
+    }
+    this.geminiKey.set('');
+    this.approvedPdfJob.set(null);
+    this.entitlementMode.set('public_byok');
+    try {
+      await logOut();
+    } catch (e) {
+      console.error('Sign-out after account deletion failed', e);
     }
   }
 

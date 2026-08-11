@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from firebase_admin_client import get_firestore_client
 from settings import get_settings
@@ -116,7 +116,12 @@ def record_ocr_usage(
 
     client = firestore_client or get_firestore_client()
     period_key = _current_period_key(now)
-    moment = (now or datetime.now(timezone.utc)).isoformat()
+    moment_dt = now or datetime.now(timezone.utc)
+    moment = moment_dt.isoformat()
+    # Keep OCR usage counters for ~60 days past the period they cover, then
+    # let Firestore TTL purge them. Long enough to debug a stuck month,
+    # short enough that we are not holding per-user usage forever.
+    expires_at = moment_dt + timedelta(days=60)
     doc_ref = client.collection(OCR_USAGE_COLLECTION).document(
         _usage_doc_id(canonical_email, period_key)
     )
@@ -135,6 +140,7 @@ def record_ocr_usage(
             "periodKey": period_key,
             "pages": new_total,
             "updatedAt": moment,
+            "expiresAt": expires_at,
         },
         merge=True,
     )
